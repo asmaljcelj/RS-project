@@ -80,7 +80,7 @@ void beriPodatke() {
   Wire.endTransmission();
   
   //** Branje: pospešek
-  //** Zdaj mikrokrmilnik bere od naslova ACC_X_OUT
+  //** Zdaj mikrokrmilnik bere od naslova ACC_OUT
   //** Bere vseh 6 bajtov (x, y in z os): 
   Wire.requestFrom(I2C_ADD_MPU, 6);
   for (int i = 0; i < 6; i++) {
@@ -124,7 +124,14 @@ void beriPodatke() {
     client.publish(topic, msg);
     // resetiramo vrednost
     acc_x = 0;
+    acc_y = 0;
+    acc_z = 0;
   }
+
+  //TODO: glajenje
+  //TODO: dinamično nastavljanje meje
+  //TODO: step detection
+  //TODO: count calories
 
   
   // števec 
