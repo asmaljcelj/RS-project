@@ -45,6 +45,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 unsigned long lastMsg = 0;
 #define MSG_BUFFER_SIZE  (50)
+#define HISTORY_SIZE 50
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
 
@@ -52,10 +53,15 @@ Ticker tick;
 int32_t table_x[TABLE_SIZE_MPU];
 int32_t table_y[TABLE_SIZE_MPU];
 int32_t table_z[TABLE_SIZE_MPU];
+int32_t SMOOTHING_WINDOW = 2;
+int32_t history_x[HISTORY_SIZE];
+int32_t history_y[HISTORY_SIZE];
+int32_t history_z[HISTORY_SIZE];
 float delilnik = 131.0f;
 float acc_x_calib = 0.0;
 float acc_y_calib = 0.0;
 float acc_z_calib = 0.0;
+float threshold = 1000000.0f;
 
 // funkcije:
 void beriPodatke();
@@ -128,15 +134,111 @@ void beriPodatke() {
     acc_z = 0;
   }
 
-  //TODO: glajenje
-  //TODO: dinamično nastavljanje meje
-  //TODO: step detection
-  //TODO: count calories
+  if (count == HISTORY_SIZE) {
+    //TODO: glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje
+    int32_t summed_x = 0;
+    int32_t summed_y = 0;
+    int32_t summed_z = 0;
+    int32_t number_summed_x = 0;
+    int32_t number_summed_y = 0;
+    int32_t number_summed_z = 0;
+    for (int i = 0; i < SMOOTHING_WINDOW; i++) {
+      int32_t start_index = i - SMOOTHING_WINDOW;
+      for (int smoothing_index = i - SMOOTHING_WINDOW; smoothing_index < i + SMOOTHING_WINDOW; smoothing_index++) {
+        if (smoothing_index < 0 || smoothing_index > HISTORY_SIZE) {
+          continue;
+        }
+        summed_x += history_x[i];
+        number_summed_x++;
+        summed_y += history_y[i];
+        number_summed_y++;
+        summed_z += history_z[i];
+        number_summed_z++;
+      }
+      int32_t average_x = summed_x / number_summed_x;
+      int32_t average_y = summed_y / number_summed_y;
+      int32_t average_z = summed_z / number_summed_z;
+      history_x[i] = average_x;
+      history_y[i] = average_y;
+      history_z[i] = average_z;
+    } 
 
-  
+    //TODO: step detection
+    
+    //TODO: dinamično nastavljanje meje
+
+    // detect maximum and minimum in either of the 3 axis
+
+    // set new threshold
+    
+    
+    
+    //TODO: count calories
+
+    count = 0;
+  }
+  history_x[count] = acc_x;
+  history_y[count] = acc_y;
+  history_z[count] = acc_z;
+    
   // števec 
   count = count+1;
   digitalWrite(PIN_LED, 1);
+}
+
+void acc_calib(){
+  
+  //digitalWrite(PIN_LED, 0);
+
+  delay(1000);
+  
+  int rate = 10;
+  int samp = 50;
+  int32_t table;
+
+  //**** MPU-9250
+  // "zapiši", od katerega naslova registra dalje želimo brati
+  for (int q=0; q<samp; q++)
+  {
+    Wire.beginTransmission(I2C_ADD_MPU);
+    Wire.write(ACC_X_OUT);
+    Wire.endTransmission();
+    
+    //** Branje: pospeškometera
+    Wire.requestFrom(I2C_ADD_MPU, 6);
+    for (int i = 0; i < 6; i++) {
+    if (i < 2) {
+      table_x = (int8_t) Wire.read();
+      table_x = acc_x << 8;
+    } else if (i < 4) {
+      table_y = (int8_t) Wire.read();
+      table_y = acc_y << 8;    
+    } else {
+      table_z = (int8_t) Wire.read();
+      table_z = acc_z << 8;
+    }
+  }
+
+    acc_x_calib += (table_x/ delilnik)/rate;
+    acc_y_calib += (table_y/ delilnik)/rate;
+    acc_z_calib += (table_z/ delilnik)/rate;
+ 
+    delay(1000/rate);
+  }
+
+  acc_x_calib /= (samp/rate);
+  acc_y_calib /= (samp/rate);
+  acc_z_calib /= (samp/rate);
+
+  Serial.print("** CALIB: ");
+  Serial.print("ACC: X= ");
+  Serial.print(acc_x_calib);
+  Serial.print("ACC: Y= ");
+  Serial.print(acc_y_calib);
+  Serial.print("ACC: Z= ");
+  Serial.print(acc_z_calib);
+  
+  delay(1000);
 }
 
 void setup_wifi() {
@@ -196,8 +298,9 @@ void setup() {
   // nastavimo frekvenco vodila na 100 kHz
   Wire.setClock(100000);
 
+  acc_calib();
   tick.attach_ms(INTERVAL, beriPodatke);
-
+  
   if (!client.connected()) {
     reconnect();
   }
