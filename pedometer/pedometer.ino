@@ -21,6 +21,7 @@ ESP8266 first reads acceleration data, then it connects to an MQTT server "broke
 #include <PubSubClient.h>
 #include<Wire.h>
 #include<Ticker.h>
+#include <limits.h>
 
 #define INTERVAL 100
 #define PIN_LED 2
@@ -57,6 +58,7 @@ int32_t SMOOTHING_WINDOW = 2;
 int32_t history_x[HISTORY_SIZE];
 int32_t history_y[HISTORY_SIZE];
 int32_t history_z[HISTORY_SIZE];
+int32_t stepCounter = 0;
 float delilnik = 131.0f;
 float acc_x_calib = 0.0;
 float acc_y_calib = 0.0;
@@ -66,6 +68,36 @@ float threshold = 1000000.0f;
 // funkcije:
 void beriPodatke();
 void acc_config();
+
+int32_t preveriNajvecjoOs() {
+  // 0 = x os
+  // 1 = y os
+  // 2 = z os
+  // initialize
+  int32_t max_x = 0;
+  int32_t max_y = 0;
+  int32_t max_z = 0;
+  // begin count
+  for (int i = 0; i < HISTORY_SIZE; i++) {
+    if (abs(history_x[i] > max_x)) {
+      max_x = abs(history_x[i]);
+    }
+    if (abs(history_y[i] > max_y)) {
+      max_y = abs(history_y[i]);
+    }
+    if (abs(history_z[i] > max_z)) {
+      max_z = abs(history_z[i]);
+    }
+  }
+  // get maximum
+  if (max_x > max_y && max_x > max_z) {
+    return 0;
+  } else if (max_y > max_x && max_y > max_z) {
+    return 1;
+  }
+  // default, vrni z
+  return 2;
+}
 
 
 void beriPodatke() {
@@ -135,7 +167,9 @@ void beriPodatke() {
   }
 
   if (count == HISTORY_SIZE) {
-    //TODO: glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje
+    Serial.print("START DETECTION STEP");
+    Serial.println("");
+    // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje
     int32_t summed_x = 0;
     int32_t summed_y = 0;
     int32_t summed_z = 0;
@@ -162,16 +196,41 @@ void beriPodatke() {
       history_y[i] = average_y;
       history_z[i] = average_z;
     } 
-
-    //TODO: step detection
-    
+  
     //TODO: dinamično nastavljanje meje
-
-    // detect maximum and minimum in either of the 3 axis
-
+    int32_t najvecjaOs = preveriNajvecjoOs();
+    int32_t maxHistory;
+    if (najvecjaOs == 0) {
+      maxHistory = histoty_x;
+    }
+    if (najvecjaOs == 1) {
+      maxHistory = histoty_y;
+    }
+    if (najvecjaOs == 2) {
+      maxHistory = histoty_z;
+    }
+    // get max and min values
+    int max_value = INT_MIN;
+    int min_value = INT_MAX;
+    for (int i = 0; i < HISTORY_SIZE; i++) {
+      if (maxHistory[i] > max_value) {
+        max_value = maxHistroy[i];
+      }
+      if (maxHistory[i] < min_value) {
+        min_value = maxHistory[i];
+      }    
+    }
+    // step detection
+    for (int i = 1; i < HISTORY_SIZE; i++) {
+      int32_t previous = maxHistory[i - 1];
+      int32_t current = maxHistory[i];
+      if (current < previous && previous > threshold && current < threshold) {
+        stepCounter++;
+      }
+    }
+  
     // set new threshold
-    
-    
+    threshold = (max_value + min_value) / 2;
     
     //TODO: count calories
 
