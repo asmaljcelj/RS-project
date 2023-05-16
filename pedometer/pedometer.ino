@@ -141,11 +141,10 @@ void beriPodatke() {
     }
   }
   
-  
-  acc_x += ((table_x / delilnik)-acc_x_calib)/RATE;
-  acc_y += ((table_y / delilnik)-acc_y_calib)/RATE;
-  acc_z += ((table_z / delilnik)-acc_z_calib)/RATE;
-
+  // izracun pospeska
+  acc_x += ((table_x / delilnik) - acc_x_calib) / RATE;
+  acc_y += ((table_y / delilnik) - acc_y_calib) / RATE;
+  acc_z += ((table_z / delilnik) - acc_z_calib) / RATE;
 
   if (count % RATE == 0)
   {
@@ -230,6 +229,8 @@ void beriPodatke() {
       int32_t previous = maxHistory[i - 1];
       int32_t current = maxHistory[i];
       if (current < previous && previous > threshold && current < threshold) {
+        Serial.print("STEP DETECTED");
+        Serial.println("");
         stepCounter++;
       }
     }
@@ -248,7 +249,7 @@ void beriPodatke() {
     
   // števec 
   count = count+1;
-  digitalWrite(PIN_LED, 1);
+  //digitalWrite(PIN_LED, 1);
 }
 
 void acc_calib(){
