@@ -208,11 +208,11 @@ void beriPodatke() {
     int32_t najvecjaOs = preveriNajvecjoOs();
     int32_t maxHistory[HISTORY_SIZE];
     if (najvecjaOs == 0) {
-      maxHistory = history_x;
+      memcpy(maxHistory, history_x, HISTORY_SIZE);
     } else if (najvecjaOs == 1) {
-      maxHistory = history_y;
+      memcpy(maxHistory, history_y, HISTORY_SIZE);
     } else if (najvecjaOs == 2) {
-      maxHistory = history_z;
+      memcpy(maxHistory, history_z, HISTORY_SIZE);
     }
     // get max and min values
     int max_value = INT_MIN;
@@ -259,7 +259,9 @@ void acc_calib(){
   
   int rate = 10;
   int samp = 50;
-  int32_t table;
+  int32_t table_x;
+  int32_t table_y;
+  int32_t table_z;
 
   //**** MPU-9250
   // "zapiši", od katerega naslova registra dalje želimo brati
