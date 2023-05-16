@@ -60,9 +60,10 @@ int32_t history_y[HISTORY_SIZE];
 int32_t history_z[HISTORY_SIZE];
 int32_t stepCounter = 0;
 float delilnik = 131.0f;
-float acc_x_calib = 0.0;
-float acc_y_calib = 0.0;
-float acc_z_calib = 0.0;
+float acc_x_calib = 0.0f;
+float acc_y_calib = 0.0f;
+float acc_z_calib = 0.0f;
+// visok threshold na zacetku, da ne zaznamo korakov v mirovanju
 float threshold = 1000000.0f;
 
 // funkcije:
@@ -106,9 +107,9 @@ void beriPodatke() {
   static float acc_x = 0.0f;
   static float acc_y = 0.0f;
   static float acc_z = 0.0f;
-  int32_t acc_x;
-  int32_t acc_y;
-  int32_t acc_z;
+  int32_t table_x;
+  int32_t table_y;
+  int32_t table_z;
   
   //**** MPU-9250
   //**** Naslov registra 
@@ -124,20 +125,26 @@ void beriPodatke() {
   for (int i = 0; i < 6; i++) {
     if (i < 2) {
       table_x = (int8_t) Wire.read();
-      table_x = acc_x << 8;
+      if (i % 2 == 0) {
+        table_x = table_x << 8;
+      }
     } else if (i < 4) {
       table_y = (int8_t) Wire.read();
-      table_y = acc_y << 8;    
+      if (i % 2 == 0) {
+        table_y = table_y << 8;    
+      }
     } else {
       table_z = (int8_t) Wire.read();
-      table_z = acc_z << 8;
+      if (i % 2 == 0) {
+        table_z = table_z << 8;
+      }
     }
   }
   
   
-  acc_x += ((table / delilnik)-acc_x_calib)/RATE;
-  acc_y += ((table / delilnik)-acc_y_calib)/RATE;
-  acc_z += ((table / delilnik)-acc_z_calib)/RATE;
+  acc_x += ((table_x / delilnik)-acc_x_calib)/RATE;
+  acc_y += ((table_y / delilnik)-acc_y_calib)/RATE;
+  acc_z += ((table_z / delilnik)-acc_z_calib)/RATE;
 
 
   if (count % RATE == 0)
@@ -199,22 +206,20 @@ void beriPodatke() {
   
     //TODO: dinamično nastavljanje meje
     int32_t najvecjaOs = preveriNajvecjoOs();
-    int32_t maxHistory;
+    int32_t maxHistory[HISTORY_SIZE];
     if (najvecjaOs == 0) {
-      maxHistory = histoty_x;
-    }
-    if (najvecjaOs == 1) {
-      maxHistory = histoty_y;
-    }
-    if (najvecjaOs == 2) {
-      maxHistory = histoty_z;
+      maxHistory = history_x;
+    } else if (najvecjaOs == 1) {
+      maxHistory = history_y;
+    } else if (najvecjaOs == 2) {
+      maxHistory = history_z;
     }
     // get max and min values
     int max_value = INT_MIN;
     int min_value = INT_MAX;
     for (int i = 0; i < HISTORY_SIZE; i++) {
       if (maxHistory[i] > max_value) {
-        max_value = maxHistroy[i];
+        max_value = maxHistory[i];
       }
       if (maxHistory[i] < min_value) {
         min_value = maxHistory[i];
@@ -234,6 +239,7 @@ void beriPodatke() {
     
     //TODO: count calories
 
+    // reset counter
     count = 0;
   }
   history_x[count] = acc_x;
@@ -260,7 +266,7 @@ void acc_calib(){
   for (int q=0; q<samp; q++)
   {
     Wire.beginTransmission(I2C_ADD_MPU);
-    Wire.write(ACC_X_OUT);
+    Wire.write(ACC_OUT);
     Wire.endTransmission();
     
     //** Branje: pospeškometera
@@ -268,13 +274,19 @@ void acc_calib(){
     for (int i = 0; i < 6; i++) {
     if (i < 2) {
       table_x = (int8_t) Wire.read();
-      table_x = acc_x << 8;
+      if (i % 2 == 0) {
+        table_x = table_x << 8;
+      }
     } else if (i < 4) {
       table_y = (int8_t) Wire.read();
-      table_y = acc_y << 8;    
+      if (i % 2 == 0) {
+        table_y = table_y << 8;    
+      }
     } else {
       table_z = (int8_t) Wire.read();
-      table_z = acc_z << 8;
+      if (i % 2 == 0) {
+        table_z = table_z << 8;
+      }
     }
   }
 
