@@ -1,10 +1,11 @@
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
 #include <Wire.h>
 #include <Ticker.h>
 #include <limits.h>
+#include <BlynkSimpleEsp8266.h>
 
-#define INTERVAL 100
+#define INTERVAL_BERI 100
+#define INTERVAL_RESET 86400
 #define PIN_LED 2
 #define I2C_ADD_MPU 104
 #define I2C_ADD_BMP 118
@@ -14,24 +15,18 @@
 #define RATE 10
 #define I2C_ADD_IO1 32
 #define ACC_OUT 59
+#define BLYNK_PRINT Serial
 
 const char *wifi_ssid = "Jansa-G";
 const char *wifi_password = "12jansa34";
-const char *mqtt_server = "d0bfc2b7d2a94820b75d41f4eb136072.s2.eu.hivemq.cloud";
-const char *mqtt_topic = "rso2023";
-const char *mqtt_client_username = "rso2023";
-const char *mqtt_client_password = "n7CpDKimu8xdtVjS";
+const char *blynk_template_id = "TMPL4bPFAc-b0";
+const char *blynk_template_name = "rs2023";
+const char *blynk_auth_token = "DZcBJHgpw8rjOJGr0kz9MuMi8C415dlp";
 
-
-WiFiClientSecure espClient;
-PubSubClient *client;
-unsigned long lastMsg = 0;
-#define MSG_BUFFER_SIZE  (50)
 #define HISTORY_SIZE 50
-char msg[MSG_BUFFER_SIZE];
-int value = 0;
 
-Ticker tick;
+Ticker tick_beri;
+Ticker tick_reset;
 int32_t table_x[TABLE_SIZE_MPU];
 int32_t table_y[TABLE_SIZE_MPU];
 int32_t table_z[TABLE_SIZE_MPU];
@@ -50,6 +45,8 @@ int32_t countsSinceLastStep = 0;
 
 // funkcije:
 void beriPodatke();
+
+void resetDailySteps();
 
 void acc_config();
 
@@ -141,13 +138,17 @@ void beriPodatke() {
     Serial.print(acc_z);
     Serial.println("");
 
-    // MQTT
-    // sends acceleration data as string stored in msg variable
-    client->loop();
-    snprintf(msg, MSG_BUFFER_SIZE, "%4.2f", acc_x);
-    Serial.print("Publish message: ");
-    Serial.println(msg);
-    client->publish(mqtt_topic, msg);
+    // sends acceleration data converted to m/s^2
+    Serial.print("Publishing message on V0: ");
+    Serial.println(acc_x * 9.81);
+    Blynk.virtualWrite(V0, acc_x * 9.81);
+    Serial.print("Publishing message on V1: ");
+    Serial.println(acc_x * 9.81);
+    Blynk.virtualWrite(V1, acc_y * 9.81);
+    Serial.print("Publishing message on V2: ");
+    Serial.println(acc_x * 9.81);
+    Blynk.virtualWrite(V2, acc_z * 9.81);
+
     // resetiramo vrednost
     acc_x = 0;
     acc_y = 0;
@@ -216,6 +217,21 @@ void beriPodatke() {
         Serial.println("");
         stepCounter++;
         countsSinceLastStep = 0;
+
+        Serial.print("Publishing message on V3: ");
+        Serial.println(stepCounter);
+        Blynk.virtualWrite(V3, stepCounter);
+
+        // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
+        if (stepCounter >= 5000) {
+          Serial.print("Publishing message on V5: ");
+          Serial.println("Daily step goal reached!");
+          Blynk.virtualWrite(V5, "Daily step goal reached!");
+        } else {
+          Serial.print("Publishing message on V4: ");
+          Serial.println("Daily step goal not yet reached!");
+          Blynk.virtualWrite(V5, "Daily step goal not yet reached!");
+        }
       }
     }
 
@@ -236,6 +252,12 @@ void beriPodatke() {
   countsSinceLastStep++;
   //digitalWrite(PIN_LED, 1);
 }
+
+void resetStepCount() {
+  stepCounter = 0;
+  Serial.println("Step count reset!");
+}
+
 
 void acc_calib() {
 
@@ -322,39 +344,13 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-void reconnect() {
-  // Loop until we're reconnected
-  while (!client->connected()) {
-    Serial.println("Attempting MQTT connection...");
-    // Create a random client ID
-    String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
-    // Attempt to connect
-    if (client->connect(clientId.c_str(), mqtt_client_username, mqtt_client_password)) {
-      Serial.println("connected");
-      // todo remove
-      client->publish(mqtt_topic, "hello world");
-      // ... and resubscribe
-      client->subscribe(mqtt_topic);
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client->state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-}
-
 void setup() {
   // Initialize the BUILTIN_LED pin as an output
   pinMode(BUILTIN_LED, OUTPUT);
   Serial.begin(115200);
   setup_wifi();
 
-  espClient.setInsecure();
-  client = new PubSubClient(espClient);
-  client->setServer(mqtt_server, 8883);
+  Blynk.begin(blynk_auth_token, wifi_ssid, wifi_password);
 
   // Inicializiramo I2C na podanih pinih
   Wire.begin(12, 14);
@@ -362,13 +358,10 @@ void setup() {
   Wire.setClock(100000);
 
   acc_calib();
-  tick.attach_ms(INTERVAL, beriPodatke);
-
-  if (!client->connected()) {
-    reconnect();
-  }
+  tick_beri.attach_ms(INTERVAL_BERI, beriPodatke);
+  tick_reset.attach(INTERVAL_RESET, resetStepCount);
 }
 
 void loop() {
-
+  Blynk.run();
 }
