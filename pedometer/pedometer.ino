@@ -1,26 +1,7 @@
-/*
- ESP8266 MQTT example
- This sketch demonstrates the capabilities of the pubsub library in combination
- with the ESP8266 board/library.
- 
- Prerequisites:
- 
- PubSubClient -> Install the library through : Arduino -> Tools -> Manage Libraries -> type PubSubClient -> install the package created by Nick O'Leary (newest version)
- 
- Git: https://github.com/knolleary/pubsubclient
- API: https://pubsubclient.knolleary.net/
-  
-ESP8266 first reads acceleration data, then it connects to an MQTT server "broker.mqtt-dashboard.com", and finally publishes acceleration measurements to the topic "RatkoACCData" 
-    
- More info:
- "broker.mqtt-dashboard.com" is a publicly available MQTT broker. You can set your own MQTT broker on ESP8266 or your laptop
- MQTT introduction: https://www.hivemq.com/mqtt-essentials/
-*/
-
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include<Wire.h>
-#include<Ticker.h>
+#include <Wire.h>
+#include <Ticker.h>
 #include <limits.h>
 
 #define INTERVAL 100
@@ -34,16 +15,16 @@ ESP8266 first reads acceleration data, then it connects to an MQTT server "broke
 #define I2C_ADD_IO1 32
 #define ACC_OUT 59
 
-// Update these with values suitable for your network.
+const char *wifi_ssid = "Jansa-G";
+const char *wifi_password = "12jansa34";
+const char *mqtt_server = "d0bfc2b7d2a94820b75d41f4eb136072.s2.eu.hivemq.cloud";
+const char *mqtt_topic = "rso2023";
+const char *mqtt_client_username = "rso2023";
+const char *mqtt_client_password = "n7CpDKimu8xdtVjS";
 
-const char* ssid = "esp8266";
-const char* password = "adminadmin";
-const char* mqtt_server = "broker.mqtt-dashboard.com";
-const char* topic = "RsProjekt123"; 
 
-
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClientSecure espClient;
+PubSubClient *client;
 unsigned long lastMsg = 0;
 #define MSG_BUFFER_SIZE  (50)
 #define HISTORY_SIZE 50
@@ -69,6 +50,7 @@ int32_t countsSinceLastStep = 0;
 
 // funkcije:
 void beriPodatke();
+
 void acc_config();
 
 int32_t preveriNajvecjoOs() {
@@ -111,17 +93,17 @@ void beriPodatke() {
   int32_t table_x;
   int32_t table_y;
   int32_t table_z;
-  
+
   //**** MPU-9250
-  //**** Naslov registra 
+  //**** Naslov registra
   // "zapiši", od katerega naslova registra dalje želimo brati
   Wire.beginTransmission(I2C_ADD_MPU);
   Wire.write(ACC_OUT);
   Wire.endTransmission();
-  
+
   //** Branje: pospešek
   //** Zdaj mikrokrmilnik bere od naslova ACC_OUT
-  //** Bere vseh 6 bajtov (x, y in z os): 
+  //** Bere vseh 6 bajtov (x, y in z os):
   Wire.requestFrom(I2C_ADD_MPU, 6);
   for (int i = 0; i < 6; i++) {
     if (i < 2) {
@@ -132,7 +114,7 @@ void beriPodatke() {
     } else if (i < 4) {
       table_y = (int8_t) Wire.read();
       if (i % 2 == 0) {
-        table_y = table_y << 8;    
+        table_y = table_y << 8;
       }
     } else {
       table_z = (int8_t) Wire.read();
@@ -141,14 +123,13 @@ void beriPodatke() {
       }
     }
   }
-  
+
   // izracun pospeska
   acc_x += ((table_x / delilnik) - acc_x_calib) / RATE;
   acc_y += ((table_y / delilnik) - acc_y_calib) / RATE;
   acc_z += ((table_z / delilnik) - acc_z_calib) / RATE;
 
-  if (count % RATE == 0)
-  {
+  if (count % RATE == 0) {
     // Izpišemo
     Serial.print("ACC_X: X= ");
     Serial.print(acc_x);
@@ -162,11 +143,11 @@ void beriPodatke() {
 
     // MQTT
     // sends acceleration data as string stored in msg variable
-    client.loop();
-    snprintf (msg, MSG_BUFFER_SIZE, "%4.2f", acc_x);
+    client->loop();
+    snprintf(msg, MSG_BUFFER_SIZE, "%4.2f", acc_x);
     Serial.print("Publish message: ");
     Serial.println(msg);
-    client.publish(topic, msg);
+    client->publish(mqtt_topic, msg);
     // resetiramo vrednost
     acc_x = 0;
     acc_y = 0;
@@ -202,8 +183,8 @@ void beriPodatke() {
       history_x[i] = average_x;
       history_y[i] = average_y;
       history_z[i] = average_z;
-    } 
-  
+    }
+
     //TODO: dinamično nastavljanje meje
     int32_t najvecjaOs = preveriNajvecjoOs();
     int32_t maxHistory[HISTORY_SIZE];
@@ -223,7 +204,7 @@ void beriPodatke() {
       }
       if (maxHistory[i] < min_value) {
         min_value = maxHistory[i];
-      }    
+      }
     }
     // step detection
     for (int i = 1; i < HISTORY_SIZE; i++) {
@@ -237,10 +218,10 @@ void beriPodatke() {
         countsSinceLastStep = 0;
       }
     }
-  
+
     // set new threshold
     threshold = (max_value + min_value) / 2;
-    
+
     //TODO: count calories
 
     // reset counter
@@ -249,19 +230,19 @@ void beriPodatke() {
   history_x[count] = acc_x;
   history_y[count] = acc_y;
   history_z[count] = acc_z;
-    
-  // števec 
-  count = count+1;
+
+  // števec
+  count = count + 1;
   countsSinceLastStep++;
   //digitalWrite(PIN_LED, 1);
 }
 
-void acc_calib(){
-  
+void acc_calib() {
+
   //digitalWrite(PIN_LED, 0);
 
   delay(1000);
-  
+
   int rate = 10;
   int samp = 50;
   int32_t table_x;
@@ -270,12 +251,11 @@ void acc_calib(){
 
   //**** MPU-9250
   // "zapiši", od katerega naslova registra dalje želimo brati
-  for (int q = 0; q < samp; q++)
-  {
+  for (int q = 0; q < samp; q++) {
     Wire.beginTransmission(I2C_ADD_MPU);
     Wire.write(ACC_OUT);
     Wire.endTransmission();
-    
+
     //** Branje: pospeškometera
     Wire.requestFrom(I2C_ADD_MPU, 6);
     for (int i = 0; i < 6; i++) {
@@ -287,7 +267,7 @@ void acc_calib(){
       } else if (i < 4) {
         table_y = (int8_t) Wire.read();
         if (i % 2 == 0) {
-          table_y = table_y << 8;    
+          table_y = table_y << 8;
         }
       } else {
         table_z = (int8_t) Wire.read();
@@ -300,7 +280,7 @@ void acc_calib(){
     acc_x_calib += (table_x / delilnik) / rate;
     acc_y_calib += (table_y / delilnik) / rate;
     acc_z_calib += (table_z / delilnik) / rate;
- 
+
     delay(1000 / rate);
   }
 
@@ -315,20 +295,19 @@ void acc_calib(){
   Serial.print(acc_y_calib);
   Serial.print("ACC: Z= ");
   Serial.print(acc_z_calib);
-  
+
   delay(1000);
 }
 
 void setup_wifi() {
-
   delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.println(wifi_ssid);
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(wifi_ssid, wifi_password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -345,19 +324,21 @@ void setup_wifi() {
 
 void reconnect() {
   // Loop until we're reconnected
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
+  while (!client->connected()) {
+    Serial.println("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (client.connect(clientId.c_str())) {
+    if (client->connect(clientId.c_str(), mqtt_client_username, mqtt_client_password)) {
       Serial.println("connected");
+      // todo remove
+      client->publish(mqtt_topic, "hello world");
       // ... and resubscribe
-      client.subscribe("inTopic");
+      client->subscribe(mqtt_topic);
     } else {
       Serial.print("failed, rc=");
-      Serial.print(client.state());
+      Serial.print(client->state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
@@ -366,20 +347,24 @@ void reconnect() {
 }
 
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  // Initialize the BUILTIN_LED pin as an output
+  pinMode(BUILTIN_LED, OUTPUT);
   Serial.begin(115200);
   setup_wifi();
-  client.setServer(mqtt_server, 1883);
+
+  espClient.setInsecure();
+  client = new PubSubClient(espClient);
+  client->setServer(mqtt_server, 8883);
 
   // Inicializiramo I2C na podanih pinih
-  Wire.begin(12,14);
+  Wire.begin(12, 14);
   // nastavimo frekvenco vodila na 100 kHz
   Wire.setClock(100000);
 
   acc_calib();
   tick.attach_ms(INTERVAL, beriPodatke);
-  
-  if (!client.connected()) {
+
+  if (!client->connected()) {
     reconnect();
   }
 }
