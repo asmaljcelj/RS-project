@@ -59,12 +59,13 @@ int32_t history_x[HISTORY_SIZE];
 int32_t history_y[HISTORY_SIZE];
 int32_t history_z[HISTORY_SIZE];
 int32_t stepCounter = 0;
-float delilnik = 131.0f;
+float delilnik = 16384.0f;
 float acc_x_calib = 0.0f;
 float acc_y_calib = 0.0f;
 float acc_z_calib = 0.0f;
 // visok threshold na zacetku, da ne zaznamo korakov v mirovanju
 float threshold = 1000000.0f;
+int32_t countsSinceLastStep = 0;
 
 // funkcije:
 void beriPodatke();
@@ -228,10 +229,12 @@ void beriPodatke() {
     for (int i = 1; i < HISTORY_SIZE; i++) {
       int32_t previous = maxHistory[i - 1];
       int32_t current = maxHistory[i];
-      if (current < previous && previous > threshold && current < threshold) {
+      if (current < previous && previous > threshold && current < threshold && countsSinceLastStep > 2) {
+        // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
         Serial.println("");
         stepCounter++;
+        countsSinceLastStep = 0;
       }
     }
   
@@ -249,6 +252,7 @@ void beriPodatke() {
     
   // števec 
   count = count+1;
+  countsSinceLastStep++;
   //digitalWrite(PIN_LED, 1);
 }
 
@@ -266,7 +270,7 @@ void acc_calib(){
 
   //**** MPU-9250
   // "zapiši", od katerega naslova registra dalje želimo brati
-  for (int q=0; q<samp; q++)
+  for (int q = 0; q < samp; q++)
   {
     Wire.beginTransmission(I2C_ADD_MPU);
     Wire.write(ACC_OUT);
@@ -275,34 +279,34 @@ void acc_calib(){
     //** Branje: pospeškometera
     Wire.requestFrom(I2C_ADD_MPU, 6);
     for (int i = 0; i < 6; i++) {
-    if (i < 2) {
-      table_x = (int8_t) Wire.read();
-      if (i % 2 == 0) {
-        table_x = table_x << 8;
-      }
-    } else if (i < 4) {
-      table_y = (int8_t) Wire.read();
-      if (i % 2 == 0) {
-        table_y = table_y << 8;    
-      }
-    } else {
-      table_z = (int8_t) Wire.read();
-      if (i % 2 == 0) {
-        table_z = table_z << 8;
+      if (i < 2) {
+        table_x = (int8_t) Wire.read();
+        if (i % 2 == 0) {
+          table_x = table_x << 8;
+        }
+      } else if (i < 4) {
+        table_y = (int8_t) Wire.read();
+        if (i % 2 == 0) {
+          table_y = table_y << 8;    
+        }
+      } else {
+        table_z = (int8_t) Wire.read();
+        if (i % 2 == 0) {
+          table_z = table_z << 8;
+        }
       }
     }
-  }
 
-    acc_x_calib += (table_x/ delilnik)/rate;
-    acc_y_calib += (table_y/ delilnik)/rate;
-    acc_z_calib += (table_z/ delilnik)/rate;
+    acc_x_calib += (table_x / delilnik) / rate;
+    acc_y_calib += (table_y / delilnik) / rate;
+    acc_z_calib += (table_z / delilnik) / rate;
  
-    delay(1000/rate);
+    delay(1000 / rate);
   }
 
-  acc_x_calib /= (samp/rate);
-  acc_y_calib /= (samp/rate);
-  acc_z_calib /= (samp/rate);
+  acc_x_calib /= (samp / rate);
+  acc_y_calib /= (samp / rate);
+  acc_z_calib /= (samp / rate);
 
   Serial.print("** CALIB: ");
   Serial.print("ACC: X= ");
