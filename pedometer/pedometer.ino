@@ -18,6 +18,7 @@
 #define ACC_OUT 59
 #define BLYNK_PRINT Serial
 #define HISTORY_SIZE 50
+#define G 9.80665
 
 const char *wifi_ssid = "Jansa-G";
 const char *wifi_password = "12jansa34";
@@ -162,7 +163,7 @@ int32_t preveriNajvecjoOs() {
 
 void beri_podatke() {
   static uint32_t count = 0;
-  digitalWrite(PIN_LED, 0);
+  //digitalWrite(PIN_LED, 0);
   static float acc_x = 0.0f;
   static float acc_y = 0.0f;
   static float acc_z = 0.0f;
@@ -203,9 +204,9 @@ void beri_podatke() {
   }
 
   // izracun pospeska
-  acc_x += ((table_x / delilnik) - acc_x_calib) / RATE;
-  acc_y += ((table_y / delilnik) - acc_y_calib) / RATE;
-  acc_z += ((table_z / delilnik) - acc_z_calib) / RATE;
+  acc_x = ((table_x * G / delilnik) - acc_x_calib);
+  acc_y = ((table_y * G / delilnik) - acc_y_calib);
+  acc_z = ((table_z * G / delilnik) - acc_z_calib);
 
   if (count % RATE == 0) {
     // Izpišemo
@@ -218,11 +219,6 @@ void beri_podatke() {
     Serial.print("ACC_Z: Z= ");
     Serial.print(acc_z);
     Serial.println("");
-
-    // resetiramo vrednost
-    acc_x = 0;
-    acc_y = 0;
-    acc_z = 0;
   }
 
   if (count == HISTORY_SIZE) {
@@ -367,16 +363,16 @@ void acc_calib() {
       }
     }
 
-    acc_x_calib += (table_x / delilnik) / rate;
-    acc_y_calib += (table_y / delilnik) / rate;
-    acc_z_calib += (table_z / delilnik) / rate;
+    acc_x_calib += (table_x / delilnik);
+    acc_y_calib += (table_y / delilnik);
+    acc_z_calib += (table_z / delilnik);
 
     delay(1000 / rate);
   }
 
-  acc_x_calib /= (samp / rate);
-  acc_y_calib /= (samp / rate);
-  acc_z_calib /= (samp / rate);
+  acc_x_calib /= samp;
+  acc_y_calib /= samp;
+  acc_z_calib /= samp;
 
   Serial.print("** CALIB: ");
   Serial.print("ACC: X= ");
@@ -434,7 +430,6 @@ void setup() {
   Blynk.begin(blynk_auth_token, wifi_ssid, wifi_password);
 
   // Inicializiramo I2C na podanih pinih
-  Wire.begin(12, 14);
   Wire.begin(12, 14);
   // nastavimo frekvenco vodila na 100 kHz
   Wire.setClock(100000);
