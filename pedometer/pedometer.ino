@@ -17,6 +17,7 @@
 #define I2C_ADD_IO1 32
 #define ACC_OUT 59
 #define BLYNK_PRINT Serial
+#define HISTORY_SIZE 50
 
 const char *wifi_ssid = "Jansa-G";
 const char *wifi_password = "12jansa34";
@@ -24,11 +25,9 @@ const char *blynk_template_id = "TMPL4bPFAc-b0";
 const char *blynk_template_name = "rs2023";
 const char *blynk_auth_token = "DZcBJHgpw8rjOJGr0kz9MuMi8C415dlp";
 
-#define HISTORY_SIZE 50
-
 Ticker tick_beri;
 Ticker tick_reset;
-Ticker tick_calroies;
+Ticker tick_calories;
 int32_t table_x[TABLE_SIZE_MPU];
 int32_t table_y[TABLE_SIZE_MPU];
 int32_t table_z[TABLE_SIZE_MPU];
@@ -36,25 +35,26 @@ int32_t SMOOTHING_WINDOW = 2;
 int32_t history_x[HISTORY_SIZE];
 int32_t history_y[HISTORY_SIZE];
 int32_t history_z[HISTORY_SIZE];
-int32_t calorie_stepCounter = 0;
+int32_t calorie_step_counter = 0;
 float total_calories_burned = 0.0;
-int32_t stepCounter = 0;
+int32_t step_counter = 0;
 float delilnik = 16384.0f;
 float acc_x_calib = 0.0f;
 float acc_y_calib = 0.0f;
 float acc_z_calib = 0.0f;
 // visok threshold na zacetku, da ne zaznamo korakov v mirovanju
 float threshold = 1000000.0f;
-int32_t countsSinceLastStep = 0;
-
+int32_t counts_since_last_step = 0;
+int32_t daily_steps = 5000;
+int32_t daily_calories = 2500;
 // izmisljeni parametri
-float weight = 85.0;
+float weight = 75.0;
 int32_t height = 178;
 
 // funkcije:
-void beriPodatke();
+void beri_podatke();
 
-void resetDailySteps();
+void reset_daily();
 
 void acc_config();
 
@@ -79,7 +79,7 @@ float get_stride(int32_t Nsteps, int32_t height) {
 }
 
 void call_kalorije_poraba() {
-  kalorije_poraba(stepCounter);
+  kalorije_poraba(step_counter);
 }
 
 void kalorije_poraba(int32_t nmb_of_steps) {
@@ -89,7 +89,7 @@ void kalorije_poraba(int32_t nmb_of_steps) {
   //  speed = steps per 2s * stride/2s
   //  stride = table of steps per 2s --> height/5, 4, 3, 2, 1.2, Height, 1.2*Height
   // Height is in cm, weight in kg
-  int32_t nmb_of_steps_in_last_2s = nmb_of_steps - calorie_stepCounter;
+  int32_t nmb_of_steps_in_last_2s = nmb_of_steps - calorie_step_counter;
   float current_calories_burned = 0.0;
 
   if (nmb_of_steps_in_last_2s == 0) {
@@ -110,13 +110,24 @@ void kalorije_poraba(int32_t nmb_of_steps) {
     Blynk.virtualWrite(V6, current_calories_burned);
   }
 
-  calorie_stepCounter += nmb_of_steps;
+  calorie_step_counter += nmb_of_steps;
 
   // todo total_calories_burned izračun
 
   Serial.print("Publishing message for 'Calories': ");
   Serial.println(total_calories_burned);
   Blynk.virtualWrite(V4, total_calories_burned);
+
+  // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
+  if (total_calories_burned >= daily_calories) {
+    Serial.print("Publishing message for 'Calories message': ");
+    Serial.println("Daily calories goal reached!");
+    Blynk.virtualWrite(V9, "Daily calories goal reached!");
+  } else {
+    Serial.print("Publishing message for 'Calories message': ");
+    Serial.println("Daily step calories not yet reached!");
+    Blynk.virtualWrite(V9, "Daily calories goal not yet reached!");
+  }
 }
 
 int32_t preveriNajvecjoOs() {
@@ -149,7 +160,7 @@ int32_t preveriNajvecjoOs() {
   return 2;
 }
 
-void beriPodatke() {
+void beri_podatke() {
   static uint32_t count = 0;
   digitalWrite(PIN_LED, 0);
   static float acc_x = 0.0f;
@@ -207,17 +218,6 @@ void beriPodatke() {
     Serial.print("ACC_Z: Z= ");
     Serial.print(acc_z);
     Serial.println("");
-
-    // sends acceleration data converted to m/s^2
-    Serial.print("Publishing message for 'Acceleration X': ");
-    Serial.println(acc_x * 9.81);
-    Blynk.virtualWrite(V0, acc_x * 9.81);
-    Serial.print("Publishing message for 'Acceleration Y': ");
-    Serial.println(acc_x * 9.81);
-    Blynk.virtualWrite(V1, acc_y * 9.81);
-    Serial.print("Publishing message for 'Acceleration Z': ");
-    Serial.println(acc_x * 9.81);
-    Blynk.virtualWrite(V2, acc_z * 9.81);
 
     // resetiramo vrednost
     acc_x = 0;
@@ -281,26 +281,26 @@ void beriPodatke() {
     for (int i = 1; i < HISTORY_SIZE; i++) {
       int32_t previous = maxHistory[i - 1];
       int32_t current = maxHistory[i];
-      if (current < previous && previous > threshold && current < threshold && countsSinceLastStep > 2) {
+      if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2) {
         // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
         Serial.println("");
-        stepCounter++;
-        countsSinceLastStep = 0;
+        step_counter++;
+        counts_since_last_step = 0;
 
         Serial.print("Publishing message for 'Step counter': ");
-        Serial.println(stepCounter);
-        Blynk.virtualWrite(V3, stepCounter);
+        Serial.println(step_counter);
+        Blynk.virtualWrite(V3, step_counter);
 
         // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
-        if (stepCounter >= 5000) {
-          Serial.print("Publishing message for 'Step message': ");
-          Serial.println("Daily step goal reached!");
-          Blynk.virtualWrite(V5, "Daily step goal reached!");
+        if (step_counter >= daily_steps) {
+          Serial.print("Publishing message for 'Steps message': ");
+          Serial.println("Daily steps goal reached!");
+          Blynk.virtualWrite(V5, "Daily steps goal reached!");
         } else {
-          Serial.print("Publishing message for 'Step message': ");
-          Serial.println("Daily step goal not yet reached!");
-          Blynk.virtualWrite(V5, "Daily step goal not yet reached!");
+          Serial.print("Publishing message for 'Steps message': ");
+          Serial.println("Daily steps goal not yet reached!");
+          Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
         }
       }
     }
@@ -318,17 +318,17 @@ void beriPodatke() {
 
   // števec
   count = count + 1;
-  countsSinceLastStep++;
+  counts_since_last_step++;
   // digitalWrite(PIN_LED, 1);
 }
 
-void resetStepCount() {
-  stepCounter = 0;
-  Serial.println("Step count reset!");
+void reset_daily() {
+  step_counter = 0;
+  total_calories_burned = 0.0;
+  Serial.println("Daily steps and calories reset!");
 }
 
 void acc_calib() {
-
   // digitalWrite(PIN_LED, 0);
 
   delay(1000);
@@ -440,10 +440,9 @@ void setup() {
   Wire.setClock(100000);
 
   acc_calib();
-  tick_beri.attach_ms(INTERVAL_BERI, beriPodatke);
-  tick_reset.attach(INTERVAL_RESET, resetStepCount);
-  // calorie ticker
-  tick_calroies.attach_ms(INTERVAL_CALORIES, call_kalorije_poraba);
+  tick_beri.attach_ms(INTERVAL_BERI, beri_podatke);
+  tick_reset.attach(INTERVAL_RESET, reset_daily);
+  tick_calories.attach_ms(INTERVAL_CALORIES, call_kalorije_poraba);
 }
 
 void loop() {
