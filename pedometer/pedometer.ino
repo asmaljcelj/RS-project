@@ -33,9 +33,9 @@ int32_t table_x[TABLE_SIZE_MPU];
 int32_t table_y[TABLE_SIZE_MPU];
 int32_t table_z[TABLE_SIZE_MPU];
 int32_t SMOOTHING_WINDOW = 2;
-int32_t history_x[HISTORY_SIZE];
-int32_t history_y[HISTORY_SIZE];
-int32_t history_z[HISTORY_SIZE];
+float history_x[HISTORY_SIZE];
+float history_y[HISTORY_SIZE];
+float history_z[HISTORY_SIZE];
 int32_t calorie_step_counter = 0;
 float total_calories_burned = 0.0;
 int32_t step_counter = 0;
@@ -131,23 +131,23 @@ void kalorije_poraba(int32_t nmb_of_steps) {
   }
 }
 
-int32_t preveriNajvecjoOs(int32_t s_table_x[TABLE_SIZE_MPU], int32_t s_table_y[TABLE_SIZE_MPU], int32_t s_table_z[TABLE_SIZE_MPU]) {
+int32_t preveriNajvecjoOs(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY_SIZE], float s_table_z[HISTORY_SIZE]) {
   // 0 = x os
   // 1 = y os
   // 2 = z os
   // initialize
-  int32_t max_x = 0;
-  int32_t max_y = 0;
-  int32_t max_z = 0;
+  float max_x = 0.0f;
+  float max_y = 0.0f;
+  float max_z = 0.0f;
   // begin count
   for (int i = 0; i < HISTORY_SIZE; i++) {
-    if (abs(s_table_x[i] > max_x)) {
+    if (abs(s_table_x[i]) > max_x) {
       max_x = abs(s_table_x[i]);
     }
-    if (abs(s_table_y[i] > max_y)) {
+    if (abs(s_table_y[i]) > max_y) {
       max_y = abs(s_table_y[i]);
     }
-    if (abs(s_table_z[i] > max_z)) {
+    if (abs(s_table_z[i]) > max_z) {
       max_z = abs(s_table_z[i]);
     }
   }
@@ -159,6 +159,13 @@ int32_t preveriNajvecjoOs(int32_t s_table_x[TABLE_SIZE_MPU], int32_t s_table_y[T
   }
   // default, vrni z
   return 2;
+}
+
+float* copyArray(float target[HISTORY_SIZE], float source[HISTORY_SIZE]) {
+  for (int i = 0; i < HISTORY_SIZE; i++) {
+    target[i] = source[i];
+  }
+  return target;
 }
 
 void beri_podatke() {
@@ -225,15 +232,15 @@ void beri_podatke() {
     Serial.print("START DETECTION STEP");
     Serial.println("");
     // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje
-    int32_t smoothed_history_x[HISTORY_SIZE];
-    int32_t smoothed_history_y[HISTORY_SIZE];
-    int32_t smoothed_history_z[HISTORY_SIZE];
+    float smoothed_history_x[HISTORY_SIZE];
+    float smoothed_history_y[HISTORY_SIZE];
+    float smoothed_history_z[HISTORY_SIZE];
     for (int i = 0; i < HISTORY_SIZE; i++) {
       Serial.print("Start smoothing at ");
       Serial.println(i);
-      int32_t summed_x = 0;
-      int32_t summed_y = 0;
-      int32_t summed_z = 0;
+      float summed_x = 0.0f;
+      float summed_y = 0.0f;
+      float summed_z = 0.0f;
       int32_t number_summed_x = 0;
       int32_t number_summed_y = 0;
       int32_t number_summed_z = 0;
@@ -263,17 +270,17 @@ void beri_podatke() {
       Serial.print(summed_x);
       Serial.print(" and ");
       Serial.println(number_summed_x);
-      int32_t average_x = summed_x / number_summed_x;
+      float average_x = summed_x / number_summed_x;
       Serial.print("Summing y: ");
       Serial.print(summed_y);
       Serial.print(" and ");
       Serial.println(number_summed_y);
-      int32_t average_y = summed_y / number_summed_y;
+      float average_y = summed_y / number_summed_y;
       Serial.print("Summing z: ");
       Serial.print(summed_z);
       Serial.print(" and ");
       Serial.println(number_summed_z);
-      int32_t average_z = summed_z / number_summed_z;
+      float average_z = summed_z / number_summed_z;
       Serial.print("Smoothed history_x[");
       Serial.print(i);
       Serial.print("] = ");
@@ -293,13 +300,18 @@ void beri_podatke() {
 
     // TODO: dinamično nastavljanje meje
     int32_t najvecjaOs = preveriNajvecjoOs(smoothed_history_x, smoothed_history_y, smoothed_history_z);
-    int32_t maxHistory[HISTORY_SIZE];
+    Serial.print("Najvecja os = ");
+    Serial.println(najvecjaOs);
+    float maxHistory[HISTORY_SIZE];
     if (najvecjaOs == 0) {
-      memcpy(maxHistory, smoothed_history_x, HISTORY_SIZE);
+      //memcpy(maxHistory, smoothed_history_x, HISTORY_SIZE);
+      maxHistory = copyArray(maxHistory, smoothed_history_x);
     } else if (najvecjaOs == 1) {
-      memcpy(maxHistory, smoothed_history_y, HISTORY_SIZE);
+      //memcpy(maxHistory, smoothed_history_y, HISTORY_SIZE);,
+      maxHistory = copyArray(maxHistory, smoothed_history_y);
     } else if (najvecjaOs == 2) {
-      memcpy(maxHistory, smoothed_history_z, HISTORY_SIZE);
+      //memcpy(maxHistory, smoothed_history_z, HISTORY_SIZE);
+      maxHistory = copyArray(maxHistory, smoothed_history_z);
     }
     // get max and min values
     int max_value = INT_MIN;
