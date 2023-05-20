@@ -352,7 +352,7 @@ void beri_podatke() {
         unsigned long cas_koraka = millis();
         if (cas_prejsnjega_koraka != 0) {
           unsigned long razlika_korakov = cas_koraka - cas_prejsnjega_koraka;
-          if (razlika >= 200) {
+          if (razlika_korakov >= 200) {
             // todo: upostevaj se cas med obema korakom (periodicnost!!!)
             Serial.print("STEP DETECTED");
             Serial.println("");
