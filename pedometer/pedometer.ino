@@ -303,6 +303,11 @@ void beri_podatke() {
     count = count + 1;
     counts_since_last_step++;
 
+    // nastavi prejsnje vrednosti
+    prev_acc_x = acc_x;
+    prev_acc_y = acc_y;
+    prev_acc_z = acc_z;
+
     // reset vrednosti
     acc_x = 0;
     acc_y = 0;
@@ -425,11 +430,6 @@ void beri_podatke() {
 
     // set new threshold
     threshold = (max_value + min_value) / 2;
-
-    // nastavi prejsnje vrednosti
-    prev_acc_x = acc_x;
-    prev_acc_y = acc_y;
-    prev_acc_z = acc_z;
 
     // reset counter
     count = 0;
