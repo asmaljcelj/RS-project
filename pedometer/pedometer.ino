@@ -7,58 +7,71 @@
 #define INTERVAL_BERI 100
 #define INTERVAL_RESET 86400
 #define INTERVAL_CALORIES 2000
-#define PIN_LED 2
 #define I2C_ADD_MPU 104
-#define I2C_ADD_BMP 118
 #define TABLE_SIZE_MPU 7
-#define GYRO_OBCUT 131
-#define REG_GYRO_CONFIG 0x1B // 27
 #define RATE 1
-#define I2C_ADD_IO1 32
 #define ACC_OUT 59
-#define BLYNK_PRINT Serial
 #define HISTORY_SIZE 50
 
+// podatki za vpis v WIFI
 const char *wifi_ssid = "Jansa-G";
 const char *wifi_password = "12jansa34";
+// podatki za vpis v blynk
 const char *blynk_template_id = "TMPL4bPFAc-b0";
 const char *blynk_template_name = "rs2023";
 const char *blynk_auth_token = "DZcBJHgpw8rjOJGr0kz9MuMi8C415dlp";
 
+// tickerji
 Ticker tick_beri;
 Ticker tick_reset;
 Ticker tick_calories;
+// tabele za izračun pospeska
 int32_t table_x[TABLE_SIZE_MPU];
 int32_t table_y[TABLE_SIZE_MPU];
 int32_t table_z[TABLE_SIZE_MPU];
-int32_t SMOOTHING_WINDOW = 1;
+// zgodovina meritev pospeska
 float history_x[HISTORY_SIZE];
 float history_y[HISTORY_SIZE];
 float history_z[HISTORY_SIZE];
-int32_t calorie_step_counter = 0;
+// velikost okna za glajanje meritev ob izracuna meje
+int32_t SMOOTHING_WINDOW = 1;
 float total_calories_burned = 0.0;
-int32_t step_counter = 0;
 float delilnik = 16384.0f;
+// kalibracijske vrednosti pospeskometra v vsaki dimenziji
 float acc_x_calib = 0.0f;
 float acc_y_calib = 0.0f;
 float acc_z_calib = 0.0f;
+// prejsnje vrednosti meritev pospeskov v vsaki dimenziji
 float prev_acc_x = 0.0f;
 float prev_acc_y = 0.0f;
 float prev_acc_z = 0.0f;
+// identifikacija osi, kjer je prislo do najvecje meritve (0 = x os, 1 = y os, 2 = z os, -1 = nedefinirano)
 int32_t max_axis = -1;
-// visok threshold na zacetku, da ne zaznamo korakov v mirovanju
-float threshold = 1000000.0f;
-int32_t counts_since_last_step = 0;
+// dnevni cilj stevila korakov
 int32_t daily_steps = 5000;
+// dnevni cilj porabljenih kalorij
 int32_t daily_calories = 2500;
-// izmisljeni parametri
+// stevec korakov
+int32_t step_counter = 0;
+// stevec korakov za namen racunanja kalorij
+int32_t calorie_step_counter = 0;
+// meja za detekcijo koraka - visoka meja na zacetku, da ne zaznamo korakov v mirovanju
+float threshold = 1000000.0f;
+// stetje stevila meritev
+uint32_t count = 0;
+
+// zacetni parametri teze in visine uporabnika, ob delovanju te podatke pridobimo iz Blynk
 float weight = 75.0;
 int32_t height = 178;
+// skupna prehojena razdalja
 float total_distance = 0.0;
-unsigned long cas_prejsnjega_koraka = 0;
+// cas v milisekundah od zadnjega zaznanega koraka
+unsigned long previous_step_time = 0;
+// najvisja in najnizja zabelezena vrednost v zadnjih 50 vzorcih
 float max_value = FLT_MIN;
 float min_value = FLT_MAX;
 
+// izracun dolzine korak iz uporabnikove visine (povzeto po tabeli iz vira)
 float get_stride(int32_t Nsteps, int32_t height) {
   if (Nsteps == 1) {
     return height / 5;
@@ -79,17 +92,18 @@ float get_stride(int32_t Nsteps, int32_t height) {
   return 0.0;
 }
 
+// ticker funkcija za klic izracuna porabe kalorij glede na stevilo opravljenih korakov
 void call_kalorije_poraba() {
   kalorije_poraba(step_counter);
 }
 
 void kalorije_poraba(int32_t nmb_of_steps) {
-  //  2 options: 1. stationary, 2. moving
-  //  stationary: C = 1 * weight/1800
-  //  moving (2 second update): C = speed * weight/400
-  //  speed = steps per 2s * stride/2s
-  //  stride = table of steps per 2s --> height/5, 4, 3, 2, 1.2, Height, 1.2*Height
-  // Height is in cm, weight in kg
+  // 2 opcije: stacionarno ali premikajoce
+  // stacionarno: C = 1 * weight / 1800
+  // premikajoce (osvezitev na 2 sekundi): C = speed * weight / 400
+  // hitrost = (# korakov / 2s) * (dolzina koraka / 2s)
+  // dolzina koraka (stride) = tabela korakov na 2s --> visina / 5, 4, 3, 2, 1.2, Visina, 1.2 * Visina
+  // visina je v cm, teza v kg
   int32_t nmb_of_steps_in_last_2s = nmb_of_steps - calorie_step_counter;
   float current_calories_burned = 0.0;
 
@@ -151,47 +165,70 @@ void kalorije_poraba(int32_t nmb_of_steps) {
 
 }
 
+// funckija, ki se klice ob detekciji koraka
 void detectStep() {
-  unsigned long cas_koraka = millis();
-  if (cas_prejsnjega_koraka != 0) {
-    unsigned long razlika_korakov = cas_koraka - cas_prejsnjega_koraka;
-      if (razlika_korakov >= 200) {
-      // todo: upostevaj se cas med obema korakom (periodicnost!!!)
-        Serial.print("STEP DETECTED");
-        Serial.println("");
-        step_counter++;
-        counts_since_last_step = 0;
-        cas_prejsnjega_koraka = cas_koraka;
-  
-        Serial.print("Publishing message for 'Step counter': ");
-        Serial.println(step_counter);
-        Blynk.virtualWrite(V3, step_counter);
-  
-        // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
-        if (step_counter >= daily_steps) {
-          Serial.print("Publishing message for 'Steps message': ");
-          Serial.println("Daily steps goal reached!");
-          Blynk.virtualWrite(V5, "Daily steps goal reached!");
-        } else {
-          Serial.print("Publishing message for 'Steps message': ");
-          Serial.println("Daily steps goal not yet reached!");
-          Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
-        }
+  // pridobimo cas, ko smo zaznali korak
+  unsigned long step_time = millis();
+  // ce smo zaznali sploh 1. korak, ga samo pristejemo in nastavimo kot cas zadnjega koraka
+  if (previous_step_time != 0) {
+    // zaznaj korak le, ce je od prejsnjega minilo vec kot 0.2 sekundi
+    unsigned long step_difference = step_time - previous_step_time;
+    if (step_difference >= 200) {
+      Serial.println("STEP DETECTED");
+      // povecaj stevec in nastavi cas zadnjega koraka na cas tega koraka
+      step_counter++;
+      previous_step_time = step_time;
+
+      // poslji na Blynk popravljeno vrednost stevca korakov
+      Serial.print("Publishing message for 'Step counter': ");
+      Serial.println(step_counter);
+      Blynk.virtualWrite(V3, step_counter);
+
+      // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov) in poslji na Blynk
+      if (step_counter >= daily_steps) {
+        Serial.print("Publishing message for 'Steps message': ");
+        Serial.println("Daily steps goal reached!");
+        Blynk.virtualWrite(V5, "Daily steps goal reached!");
+      } else {
+        Serial.print("Publishing message for 'Steps message': ");
+        Serial.println("Daily steps goal not yet reached!");
+        Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
       }
+    }
   } else {
-    cas_prejsnjega_koraka = cas_koraka;
+    Serial.println("STEP DETECTED");
+    // povecaj stevec in nastavi cas zadnjega koraka na cas tega koraka
+    step_counter++;
+    previous_step_time = step_time;
+
+    // poslji na Blynk popravljeno vrednost stevca korakov
+    Serial.print("Publishing message for 'Step counter': ");
+    Serial.println(step_counter);
+    Blynk.virtualWrite(V3, step_counter);
+
+    // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov) in poslji na Blynk
+    if (step_counter >= daily_steps) {
+      Serial.print("Publishing message for 'Steps message': ");
+      Serial.println("Daily steps goal reached!");
+      Blynk.virtualWrite(V5, "Daily steps goal reached!");
+    } else {
+      Serial.print("Publishing message for 'Steps message': ");
+      Serial.println("Daily steps goal not yet reached!");
+      Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
+    }
   }
 }
 
-int32_t preveriNajvecjoOs(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY_SIZE], float s_table_z[HISTORY_SIZE]) {
+// vrni os, v kateri je bila zaznana najvecja vrednost
+int32_t checkAxisHighestPeak(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY_SIZE], float s_table_z[HISTORY_SIZE]) {
   // 0 = x os
   // 1 = y os
   // 2 = z os
-  // initialize
+  // inicializacija
   float max_x = 0.0f;
   float max_y = 0.0f;
   float max_z = 0.0f;
-  // begin count
+  // iskanje najvecji vrednosti v vsaki dimenziji
   for (int i = 0; i < HISTORY_SIZE; i++) {
     if (s_table_x[i] > max_x) {
       max_x = s_table_x[i];
@@ -203,38 +240,32 @@ int32_t preveriNajvecjoOs(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY
       max_z = s_table_z[i];
     }
   }
-  // get maximum
+  // primerjava in vracanje najvecje vrednosti
   if (max_x > max_y && max_x > max_z) {
     return 0;
   } else if (max_y > max_x && max_y > max_z) {
     return 1;
   }
-  // default, vrni z
   return 2;
 }
 
+// branje podatkov pospeskometra in detekcija korakov
 void beri_podatke() {
-  static uint32_t count = 0;
-  //digitalWrite(PIN_LED, 0);
-  static float acc_x = 0.0f;
-  static float acc_y = 0.0f;
-  static float acc_z = 0.0f;
-  int32_t table_x;
-  int32_t table_y;
-  int32_t table_z;
+  // inicializacija vrednosti tabel za branje in vrednosti za shranjevanje pospeskov
+  float acc_x = 0.0f;
+  float acc_y = 0.0f;
+  float acc_z = 0.0f;
+  int32_t table_x = 0;
+  int32_t table_y = 0;
+  int32_t table_z = 0;
 
-  //**** MPU-9250
-  //**** Naslov registra
-  //**** Naslov registra
-  // "zapiši", od katerega naslova registra dalje želimo brati
+  //branje pospeska iz registrov
   Wire.beginTransmission(I2C_ADD_MPU);
   Wire.write(ACC_OUT);
   Wire.endTransmission();
 
-  //** Branje: pospešek
-  //** Zdaj mikrokrmilnik bere od naslova ACC_OUT
-  //** Bere vseh 6 bajtov (x, y in z os):
-  //** Bere vseh 6 bajtov (x, y in z os):
+  // preberemo vseh 6 bajtov (x, y in z os)
+  // ce beremo 1. bit iz posamezne osi, naredimo premik za 8 bitov, ker ta vrednost predstavlja zgornji bajt
   Wire.requestFrom(I2C_ADD_MPU, 6);
   for (int i = 0; i < 6; i++) {
     if (i < 2) {
@@ -255,87 +286,55 @@ void beri_podatke() {
     }
   }
 
-  // izracun pospeska
+  // izracun pospeska z upostevanjem kalibracije
   acc_x += ((table_x / delilnik) - acc_x_calib);
   acc_y += ((table_y / delilnik) - acc_y_calib);
   acc_z += ((table_z / delilnik) - acc_z_calib);
 
+  // merjenje izvajamo ob dolocenem intervalu
   if (count % RATE == 0) {
-    // Izpišemo in shranimo pospesek
-    Serial.print("ACC_X: X= ");
-    Serial.print(acc_x);
-    Serial.println("");
-    Serial.print("ACC_Y: Y= ");
-    Serial.print(acc_y);
-    Serial.println("");
-    Serial.print("ACC_Z: Z= ");
-    Serial.print(acc_z);
-    Serial.println("");
-
+    // izracunamo in shranimo izmerjene vrednosti
     history_x[count] = acc_x / RATE;
     history_y[count] = acc_y / RATE;
     history_z[count] = acc_z / RATE;
 
-    Serial.print("maxAxis = ");
-    Serial.println(max_axis);
-    Serial.print("Threshold = ");
-    Serial.println(threshold);
+    // detekcijo korakov ne izvajamo ob 1. intervalu (50 vzorcev), saj se nimamo informacije, v kateri osi imamo najvisji premik 
     if (max_axis != -1) {
-      // prvih 50 meritev ne detektiramo, ker se ne vemo, v kateri osi imamo maximum
       if (max_axis == 0) {
         // x os
-        Serial.print("current = ");
-        Serial.println(acc_x);
-        Serial.print("previous = ");
-        Serial.println(prev_acc_x);
-        //current < previous && previous > threshold && current < threshold && abs(previous - current) > 0.05
         if (acc_x < prev_acc_x && prev_acc_x > threshold && acc_x < threshold && abs(max_value - min_value) > 0.05) {
-          // step detected
           detectStep();
         }
       } else if (max_axis == 1) {
         // y os
-        Serial.print("current = ");
-        Serial.println(acc_y);
-        Serial.print("previous = ");
-        Serial.println(prev_acc_y);
         if (acc_y < prev_acc_y && prev_acc_y > threshold && acc_y < threshold && abs(max_value - min_value) > 0.05) {
-          // step detected
-          
           detectStep();
         }
       } else if (max_axis == 2) {
-        Serial.print("current = ");
-        Serial.println(acc_z);
-        Serial.print("previous = ");
-        Serial.println(prev_acc_z);
+        // z os
         if (acc_z < prev_acc_z && prev_acc_z > threshold && acc_z < threshold && abs(max_value - min_value) > 0.05) {
-          // step detected
           detectStep();
         }
       }
     }
 
-    // števec
-    count = count + 1;
-    counts_since_last_step++;
+    // povecanje stevca meritev
+    count++;
 
-    // nastavi prejsnje vrednosti
+    // nastavi trenutne vrednosti pospeska kot prejsnje vrednosti
     prev_acc_x = acc_x;
     prev_acc_y = acc_y;
     prev_acc_z = acc_z;
 
-    // reset vrednosti
+    // reset vrednosti trenutnega pospeska
     acc_x = 0;
     acc_y = 0;
     acc_z = 0;
   }
 
+  // na vsakih HISTORY_SIZE (50) vzorcev, dolocimo novo mejo za detekcijo korakov
   if (count == HISTORY_SIZE) {
-    // izracun meje
-    Serial.print("START DETECTION STEP");
-    Serial.println("");
-    // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje)
+    // glajenje (vzemi SMOOTHING WINDOW (1) podatkov in trenutni podatek in vstavimo povprečje)
     float smoothed_history_x[HISTORY_SIZE];
     float smoothed_history_y[HISTORY_SIZE];
     float smoothed_history_z[HISTORY_SIZE];
@@ -346,8 +345,8 @@ void beri_podatke() {
       int32_t number_summed_x = 0;
       int32_t number_summed_y = 0;
       int32_t number_summed_z = 0;
-      int32_t start_index = i - SMOOTHING_WINDOW;
       for (int smoothing_index = i - SMOOTHING_WINDOW; smoothing_index <= i + SMOOTHING_WINDOW; smoothing_index++) {
+        // ce je trenutni indeks izven meja, ga ignoriramo
         if (smoothing_index < 0 || smoothing_index >= HISTORY_SIZE) {
           continue;
         }
@@ -358,6 +357,7 @@ void beri_podatke() {
         summed_z += history_z[smoothing_index];
         number_summed_z++;
       }
+      // izracun in shranjevanje povprecja
       float average_x = summed_x / (number_summed_x * 1.0f);
       float average_y = summed_y / (number_summed_y * 1.0f);
       float average_z = summed_z / (number_summed_z * 1.0f);
@@ -366,11 +366,10 @@ void beri_podatke() {
       smoothed_history_z[i] = average_z;
     }
 
-    // TODO: dinamično nastavljanje meje
-    max_axis = preveriNajvecjoOs(smoothed_history_x, smoothed_history_y, smoothed_history_z);
-    Serial.print("Najvecja os = ");
-    Serial.println(max_axis);
+    // najdemo dimenzijo, v kateri smo zaznali najvisjo vrednost
+    max_axis = checkAxisHighestPeak(smoothed_history_x, smoothed_history_y, smoothed_history_z);
     float maxHistory[HISTORY_SIZE];
+    // shranimo ustrezno tabelo v maxHistory
     if (max_axis == 0) {
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_x[i];
@@ -384,7 +383,7 @@ void beri_podatke() {
         maxHistory[i] = smoothed_history_z[i];
       }
     }
-    // get max and min values
+    // posodobitev najvecje in najmanjse vrednosti v intervalu
     max_value = FLT_MIN;
     min_value = FLT_MAX;
     for (int i = 0; i < HISTORY_SIZE; i++) {
@@ -395,65 +394,13 @@ void beri_podatke() {
         min_value = maxHistory[i];
       }
     }
-    Serial.print("max_value = ");
-    Serial.println(max_value);
-    Serial.print("min_value = ");
-    Serial.println(min_value);
-    // step detection
-    Serial.println("STEP_DETECTION");
-    Serial.print("Threshold = ");
-    Serial.println(threshold);
-    /*
-    for (int i = 1; i < HISTORY_SIZE; i++) {
-      float previous = maxHistory[i - 1];
-      float current = maxHistory[i];
-      if (current < previous && previous > threshold && current < threshold && abs(previous - current) > 0.05) {
-        unsigned long cas_koraka = millis();
-        if (cas_prejsnjega_koraka != 0) {
-          unsigned long razlika_korakov = cas_koraka - cas_prejsnjega_koraka;
-          if (razlika_korakov >= 200) {
-            // todo: upostevaj se cas med obema korakom (periodicnost!!!)
-            Serial.print("STEP DETECTED");
-            Serial.println("");
-            Serial.print("current = ");
-            Serial.println(current);
-            Serial.print("previous = ");
-            Serial.println(previous);
-            step_counter++;
-            counts_since_last_step = 0;
-            cas_prejsnjega_koraka = cas_koraka;
 
-            Serial.print("Publishing message for 'Step counter': ");
-            Serial.println(step_counter);
-            Blynk.virtualWrite(V3, step_counter);
-
-            // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
-            if (step_counter >= daily_steps) {
-              Serial.print("Publishing message for 'Steps message': ");
-              Serial.println("Daily steps goal reached!");
-              Blynk.virtualWrite(V5, "Daily steps goal reached!");
-            } else {
-              Serial.print("Publishing message for 'Steps message': ");
-              Serial.println("Daily steps goal not yet reached!");
-              Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
-            }
-          }
-        } else {
-          cas_prejsnjega_koraka = cas_koraka;
-        }
-      }
-    }
-    */
-
-    // set new threshold
+    // izracun nove meje
     threshold = (max_value + min_value) / 2;
 
-    // reset counter
+    // resetiranje stevca
     count = 0;
   }
-
-
-  // digitalWrite(PIN_LED, 1);
 }
 
 void reset_daily() {
@@ -478,25 +425,23 @@ void init_blynk() {
   Blynk.syncVirtual(V8);
 }
 
+// kalibracija vrednosti pospeskometra
 void acc_calib() {
-  // digitalWrite(PIN_LED, 0);
-
   delay(1000);
 
   int rate = 10;
   int samp = 50;
-  int32_t table_x;
-  int32_t table_y;
-  int32_t table_z;
+  int32_t table_x = 0;
+  int32_t table_y = 0;
+  int32_t table_z = 0;
 
-  //**** MPU-9250
-  // "zapiši", od katerega naslova registra dalje želimo brati
   for (int q = 0; q < samp; q++) {
+    // branje vrednosti pospeskometra
     Wire.beginTransmission(I2C_ADD_MPU);
     Wire.write(ACC_OUT);
     Wire.endTransmission();
 
-    //** Branje: pospeškometera
+    // preberemo vseh 6 bajtov (x, y in z os) pospeskometra
     Wire.requestFrom(I2C_ADD_MPU, 6);
     for (int i = 0; i < 6; i++) {
       if (i < 2) {
@@ -524,18 +469,10 @@ void acc_calib() {
     delay(1000 / rate);
   }
 
+  // izracun vrednosti
   acc_x_calib /= samp;
   acc_y_calib /= samp;
   acc_z_calib /= samp;
-
-  Serial.print("** CALIB: ");
-  Serial.print("ACC: X= ");
-  Serial.print(acc_x_calib);
-  Serial.print("ACC: Y= ");
-  Serial.print(acc_y_calib);
-  Serial.print("ACC: Z= ");
-  Serial.print(acc_z_calib);
-  Serial.println();
 
   delay(1000);
 }
@@ -588,14 +525,14 @@ void setup() {
   // nastavimo frekvenco vodila na 100 kHz
   Wire.setClock(100000);
 
-  // na register 107 pošlji vrednost 128
+  // na register 107 posljemo vrednost 128
   Wire.beginTransmission(I2C_ADD_MPU);
   Wire.write(107);
   Wire.write(128);
   Wire.endTransmission();
   delay(100);
 
-  // na register 28 poslji 0
+  // na register 28 posljemo vrednost 0
   Wire.beginTransmission(I2C_ADD_MPU);
   Wire.write(28);
   Wire.write(0);
