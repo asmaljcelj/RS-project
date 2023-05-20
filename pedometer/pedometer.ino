@@ -265,36 +265,41 @@ void beri_podatke() {
     acc_z = 0;
   }
 
+  Serial.print("maxAxis = ");
+  Serial.println(max_axis);
+  Serial.print("Threshold = ");
+  Serial.println(threshold);
   if (max_axis != -1) {
     // prvih 50 meritev ne detektiramo, ker se ne vemo, v kateri osi imamo maximum
     if (max_axis == 0) {
       // x os
+      Serial.print("current = ");
+      Serial.println(acc_x);
+      Serial.print("previous = ");
+      Serial.println(prev_acc_x);
       //current < previous && previous > threshold && current < threshold && abs(previous - current) > 0.05
       if (acc_x < prev_acc_x && prev_acc_x > threshold && acc_x < threshold && abs(max_value - min_value) > 0.05) {
         // step detected
-        Serial.print("current = ");
-        Serial.println(acc_x);
-        Serial.print("previous = ");
-        Serial.println(prev_acc_x);
         detectStep();
       }
     } else if (max_axis == 1) {
       // y os
+      Serial.print("current = ");
+      Serial.println(acc_y);
+      Serial.print("previous = ");
+      Serial.println(prev_acc_y);
       if (acc_y < prev_acc_y && prev_acc_y > threshold && acc_y < threshold && abs(max_value - min_value) > 0.05) {
         // step detected
-        Serial.print("current = ");
-        Serial.println(acc_y);
-        Serial.print("previous = ");
-        Serial.println(prev_acc_y);
+        
         detectStep();
       }
     } else if (max_axis == 2) {
+      Serial.print("current = ");
+      Serial.println(acc_z);
+      Serial.print("previous = ");
+      Serial.println(prev_acc_z);
       if (acc_z < prev_acc_z && prev_acc_z > threshold && acc_z < threshold && abs(max_value - min_value) > 0.05) {
         // step detected
-        Serial.print("current = ");
-        Serial.println(acc_z);
-        Serial.print("previous = ");
-        Serial.println(prev_acc_z);
         detectStep();
       }
     }
