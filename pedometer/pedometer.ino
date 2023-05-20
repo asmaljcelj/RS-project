@@ -138,10 +138,6 @@ void detectStep() {
       // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
         Serial.println("");
-        Serial.print("current = ");
-        Serial.println(current);
-        Serial.print("previous = ");
-        Serial.println(previous);
         step_counter++;
         counts_since_last_step = 0;
         cas_prejsnjega_koraka = cas_koraka;
@@ -276,17 +272,29 @@ void beri_podatke() {
       //current < previous && previous > threshold && current < threshold && abs(previous - current) > 0.05
       if (acc_x < prev_acc_x && prev_acc_x > threshold && acc_x < threshold && abs(max_value - min_value) > 0.05) {
         // step detected
+        Serial.print("current = ");
+        Serial.println(acc_x);
+        Serial.print("previous = ");
+        Serial.println(prev_acc_x);
         detectStep();
       }
     } else if (max_axis == 1) {
       // y os
       if (acc_y < prev_acc_y && prev_acc_y > threshold && acc_y < threshold && abs(max_value - min_value) > 0.05) {
         // step detected
+        Serial.print("current = ");
+        Serial.println(acc_y);
+        Serial.print("previous = ");
+        Serial.println(prev_acc_y);
         detectStep();
       }
     } else if (max_axis == 2) {
       if (acc_z < prev_acc_z && prev_acc_z > threshold && acc_z < threshold && abs(max_value - min_value) > 0.05) {
         // step detected
+        Serial.print("current = ");
+        Serial.println(acc_z);
+        Serial.print("previous = ");
+        Serial.println(prev_acc_z);
         detectStep();
       }
     }
