@@ -382,11 +382,30 @@ void beri_podatke() {
 void reset_daily() {
   step_counter = 0;
   total_calories_burned = 0.0;
-  Serial.println("Daily steps and calories reset!");
+  Serial.println("Daily steps and calories reset");
 }
 
-void acc_calib() {
-  // digitalWrite(PIN_LED, 0);
+void init_blynk() {
+  // resetiramo vrednosti na nadzorni plošči
+  Blynk.virtualWrite(V3, 0);
+  Blynk.virtualWrite(V4, 0.0);
+  Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
+  Blynk.virtualWrite(V6, 0.0);
+  Blynk.virtualWrite(V9, "Daily calories goal not yet reached!");
+
+  // prvič ročno preberemo višino in težo
+  Blynk.syncVirtual(V7);
+  Serial.print("height: ");
+  Serial.println(height);
+  Blynk.syncVirtual(V8);
+  Serial.print("weight: ");
+  Serial.println(weight);
+
+  Serial.println("Resetting all values");
+}
+
+void acc_calib()
+ {  // digitalWrite(PIN_LED, 0);
 
   delay(1000);
 
@@ -442,6 +461,7 @@ void acc_calib() {
   Serial.print(acc_y_calib);
   Serial.print("ACC: Z= ");
   Serial.print(acc_z_calib);
+  Serial.println();
 
   delay(1000);
 }
@@ -475,7 +495,6 @@ BLYNK_WRITE(V7) {
     Serial.println(height);
 }
 
-// Weight
 BLYNK_WRITE(V8)   {
     weight = param.asFloat();
     Serial.print("Reading message for 'Weight': ");
@@ -496,6 +515,7 @@ void setup() {
   Wire.setClock(100000);
 
   acc_calib();
+  init_blynk();
   tick_beri.attach_ms(INTERVAL_BERI, beri_podatke);
   tick_reset.attach(INTERVAL_RESET, reset_daily);
   tick_calories.attach_ms(INTERVAL_CALORIES, call_kalorije_poraba);
