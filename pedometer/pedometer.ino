@@ -92,14 +92,18 @@ void kalorije_poraba(int32_t nmb_of_steps) {
   int32_t nmb_of_steps_in_last_2s = nmb_of_steps - calorie_step_counter;
   float current_calories_burned = 0.0;
 
-  if (nmb_of_steps_in_last_2s == 0) {
+  if (nmb_of_steps == calorie_step_counter) {
     // stationary
     current_calories_burned = weight / 1800;
 
     Serial.print("Publishing message for 'Current calories': ");
     Serial.println(current_calories_burned);
     Blynk.virtualWrite(V6, current_calories_burned);
-  } else {
+
+  } else if (nmb_of_steps > calorie_step_counter) {
+    // moving
+    int32_t nmb_of_steps_in_last_2s = nmb_of_steps - calorie_step_counter;
+
     float stride = get_stride(nmb_of_steps_in_last_2s, height);
 
     float speed = nmb_of_steps_in_last_2s * stride;
@@ -108,9 +112,9 @@ void kalorije_poraba(int32_t nmb_of_steps) {
     Serial.print("Publishing message for 'Current calories': ");
     Serial.println(current_calories_burned);
     Blynk.virtualWrite(V6, current_calories_burned);
-  }
 
-  calorie_step_counter += nmb_of_steps;
+    calorie_step_counter = nmb_of_steps;
+  }
 
   // todo total_calories_burned izračun
 
