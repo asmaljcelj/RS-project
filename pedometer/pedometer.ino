@@ -161,13 +161,6 @@ int32_t preveriNajvecjoOs(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY
   return 2;
 }
 
-float[HISTORY_SIZE] copyArray(float target[HISTORY_SIZE], float source[HISTORY_SIZE]) {
-  for (int i = 0; i < HISTORY_SIZE; i++) {
-    target[i] = source[i];
-  }
-  return target;
-}
-
 void beri_podatke() {
   static uint32_t count = 0;
   //digitalWrite(PIN_LED, 0);
@@ -305,13 +298,19 @@ void beri_podatke() {
     float maxHistory[HISTORY_SIZE];
     if (najvecjaOs == 0) {
       //memcpy(maxHistory, smoothed_history_x, HISTORY_SIZE);
-      maxHistory = copyArray(maxHistory, smoothed_history_x);
+      for (int i = 0; i < HISTORY_SIZE; i++) {
+        maxHistory[i] = smoothed_history_x[i];
+      }
     } else if (najvecjaOs == 1) {
       //memcpy(maxHistory, smoothed_history_y, HISTORY_SIZE);,
-      maxHistory = copyArray(maxHistory, smoothed_history_y);
+      for (int i = 0; i < HISTORY_SIZE; i++) {
+        maxHistory[i] = smoothed_history_y[i];
+      }
     } else if (najvecjaOs == 2) {
       //memcpy(maxHistory, smoothed_history_z, HISTORY_SIZE);
-      maxHistory = copyArray(maxHistory, smoothed_history_z);
+      for (int i = 0; i < HISTORY_SIZE; i++) {
+        maxHistory[i] = smoothed_history_z[i];
+      }
     }
     // get max and min values
     int max_value = INT_MIN;
