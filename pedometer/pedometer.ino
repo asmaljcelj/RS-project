@@ -393,17 +393,17 @@ void acc_calib() {
     Wire.requestFrom(I2C_ADD_MPU, 6);
     for (int i = 0; i < 6; i++) {
       if (i < 2) {
-        table_x = (int8_t) Wire.read();
+        table_x += (int8_t) Wire.read();
         if (i % 2 == 0) {
           table_x = table_x << 8;
         }
       } else if (i < 4) {
-        table_y = (int8_t) Wire.read();
+        table_y += (int8_t) Wire.read();
         if (i % 2 == 0) {
           table_y = table_y << 8;
         }
       } else {
-        table_z = (int8_t) Wire.read();
+        table_z += (int8_t) Wire.read();
         if (i % 2 == 0) {
           table_z = table_z << 8;
         }
