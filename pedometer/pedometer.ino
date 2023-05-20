@@ -334,7 +334,7 @@ void beri_podatke() {
     for (int i = 1; i < HISTORY_SIZE; i++) {
       float previous = maxHistory[i - 1];
       float current = maxHistory[i];
-      if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2 && counts_since_last_step < 20) {
+      if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2) {
         // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
         Serial.println("");
