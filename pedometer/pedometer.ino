@@ -18,7 +18,6 @@
 #define ACC_OUT 59
 #define BLYNK_PRINT Serial
 #define HISTORY_SIZE 50
-#define G 9.80665
 
 const char *wifi_ssid = "Jansa-G";
 const char *wifi_password = "12jansa34";
@@ -198,9 +197,9 @@ void beri_podatke() {
   }
 
   // izracun pospeska
-  acc_x += ((table_x * G / delilnik) - acc_x_calib);
-  acc_y += ((table_y * G / delilnik) - acc_y_calib);
-  acc_z += ((table_z * G / delilnik) - acc_z_calib);
+  acc_x += ((table_x / delilnik) - acc_x_calib);
+  acc_y += ((table_y / delilnik) - acc_y_calib);
+  acc_z += ((table_z / delilnik) - acc_z_calib);
 
   if (count % RATE == 0) {
     // Izpišemo in shranimo pospesek
@@ -410,9 +409,9 @@ void acc_calib() {
       }
     }
 
-    acc_x_calib += (table_x * G / delilnik);
-    acc_y_calib += (table_y * G / delilnik);
-    acc_z_calib += (table_z * G / delilnik);
+    acc_x_calib += (table_x / delilnik);
+    acc_y_calib += (table_y / delilnik);
+    acc_z_calib += (table_z / delilnik);
 
     delay(1000 / rate);
   }
