@@ -54,6 +54,7 @@ int32_t daily_calories = 2500;
 // izmisljeni parametri
 float weight = 75.0;
 int32_t height = 178;
+float total_distance = 0.0;
 unsigned long cas_prejsnjega_koraka = 0;
 float max_value = FLT_MIN;
 float min_value = FLT_MAX;
@@ -117,6 +118,7 @@ void kalorije_poraba(int32_t nmb_of_steps) {
   }
 
   // todo total_calories_burned izračun
+  total_calories_burned += current_calories_burned;
 
   Serial.print("Publishing message for 'Calories': ");
   Serial.println(total_calories_burned);
@@ -132,6 +134,17 @@ void kalorije_poraba(int32_t nmb_of_steps) {
     Serial.println("Daily step calories not yet reached!");
     Blynk.virtualWrite(V9, "Daily calories goal not yet reached!");
   }
+
+  // Distance:
+  // Get average length of a step based on height
+  float step_length = height * 0.4; 
+  float distance_current = nmb_of_steps_in_last_2s * step_length;
+
+  total_distance += distance_current;
+  Serial.print("Publishing message for 'Total distance': ");
+  Serial.println("Miklo gej!");
+  Blynk.virtualWrite(V10, total_distance);
+
 }
 
 void detectStep() {
