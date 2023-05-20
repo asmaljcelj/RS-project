@@ -131,7 +131,7 @@ void kalorije_poraba(int32_t nmb_of_steps) {
   }
 }
 
-int32_t preveriNajvecjoOs() {
+int32_t preveriNajvecjoOs(int32_t s_table_x[TABLE_SIZE_MPU], int32_t s_table_y[TABLE_SIZE_MPU], int32_t s_table_z[TABLE_SIZE_MPU]) {
   // 0 = x os
   // 1 = y os
   // 2 = z os
@@ -141,14 +141,14 @@ int32_t preveriNajvecjoOs() {
   int32_t max_z = 0;
   // begin count
   for (int i = 0; i < HISTORY_SIZE; i++) {
-    if (abs(history_x[i] > max_x)) {
-      max_x = abs(history_x[i]);
+    if (abs(s_table_x[i] > max_x)) {
+      max_x = abs(s_table_x[i]);
     }
-    if (abs(history_y[i] > max_y)) {
-      max_y = abs(history_y[i]);
+    if (abs(s_table_y[i] > max_y)) {
+      max_y = abs(s_table_y[i]);
     }
-    if (abs(history_z[i] > max_z)) {
-      max_z = abs(history_z[i]);
+    if (abs(s_table_z[i] > max_z)) {
+      max_z = abs(s_table_z[i]);
     }
   }
   // get maximum
@@ -225,42 +225,81 @@ void beri_podatke() {
     Serial.print("START DETECTION STEP");
     Serial.println("");
     // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje
-    int32_t summed_x = 0;
-    int32_t summed_y = 0;
-    int32_t summed_z = 0;
-    int32_t number_summed_x = 0;
-    int32_t number_summed_y = 0;
-    int32_t number_summed_z = 0;
-    for (int i = 0; i < SMOOTHING_WINDOW; i++) {
+    int32_t smoothed_history_x[HISTORY_SIZE];
+    int32_t smoothed_history_y[HISTORY_SIZE];
+    int32_t smoothed_history_z[HISTORY_SIZE];
+    for (int i = 0; i < HISTORY_SIZE; i++) {
+      Serial.print("Start smoothing at ");
+      Serial.println(i);
+      int32_t summed_x = 0;
+      int32_t summed_y = 0;
+      int32_t summed_z = 0;
+      int32_t number_summed_x = 0;
+      int32_t number_summed_y = 0;
+      int32_t number_summed_z = 0;
       int32_t start_index = i - SMOOTHING_WINDOW;
+      Serial.print("START INDEX = ");
+      Serial.println(start_index);
       for (int smoothing_index = i - SMOOTHING_WINDOW; smoothing_index < i + SMOOTHING_WINDOW; smoothing_index++) {
         if (smoothing_index < 0 || smoothing_index > HISTORY_SIZE) {
           continue;
         }
+        Serial.print("Summing at index ");
+        Serial.println(smoothing_index);
+        Serial.print("Adding to x ");
+        Serial.println(history_x[i]);
         summed_x += history_x[i];
         number_summed_x++;
+        Serial.print("Adding to y ");
+        Serial.println(history_y[i]);
         summed_y += history_y[i];
         number_summed_y++;
+        Serial.print("Adding to z ");
+        Serial.println(history_z[i]);
         summed_z += history_z[i];
         number_summed_z++;
       }
+      Serial.print("Summing x: ");
+      Serial.print(summed_x);
+      Serial.print(" and ");
+      Serial.println(number_summed_x);
       int32_t average_x = summed_x / number_summed_x;
+      Serial.print("Summing y: ");
+      Serial.print(summed_y);
+      Serial.print(" and ");
+      Serial.println(number_summed_y);
       int32_t average_y = summed_y / number_summed_y;
+      Serial.print("Summing z: ");
+      Serial.print(summed_z);
+      Serial.print(" and ");
+      Serial.println(number_summed_z);
       int32_t average_z = summed_z / number_summed_z;
-      history_x[i] = average_x;
-      history_y[i] = average_y;
-      history_z[i] = average_z;
+      Serial.print("Smoothed history_x[");
+      Serial.print(i);
+      Serial.print("] = ");
+      Serial.println(average_x);
+      smoothed_history_x[i] = average_x;
+      Serial.print("Smoothed history_y[");
+      Serial.print(i);
+      Serial.print("] = ");
+      Serial.println(average_y);
+      smoothed_history_y[i] = average_y;
+      Serial.print("Smoothed history_z[");
+      Serial.print(i);
+      Serial.print("] = ");
+      Serial.println(average_z);
+      smoothed_history_z[i] = average_z;
     }
 
     // TODO: dinamično nastavljanje meje
-    int32_t najvecjaOs = preveriNajvecjoOs();
+    int32_t najvecjaOs = preveriNajvecjoOs(smoothed_history_x, smoothed_history_y, smoothed_history_z);
     int32_t maxHistory[HISTORY_SIZE];
     if (najvecjaOs == 0) {
-      memcpy(maxHistory, history_x, HISTORY_SIZE);
+      memcpy(maxHistory, smoothed_history_x, HISTORY_SIZE);
     } else if (najvecjaOs == 1) {
-      memcpy(maxHistory, history_y, HISTORY_SIZE);
+      memcpy(maxHistory, smoothed_history_y, HISTORY_SIZE);
     } else if (najvecjaOs == 2) {
-      memcpy(maxHistory, history_z, HISTORY_SIZE);
+      memcpy(maxHistory, smoothed_history_z, HISTORY_SIZE);
     }
     // get max and min values
     int max_value = INT_MIN;
@@ -273,7 +312,14 @@ void beri_podatke() {
         min_value = maxHistory[i];
       }
     }
+    Serial.print("max_value = ");
+    Serial.println(max_value);
+    Serial.print("min_value = ");
+    Serial.println(min_value);
     // step detection
+    Serial.println("STEP_DETECTION");
+    Serial.print("Threshold = ");
+    Serial.println(threshold);
     for (int i = 1; i < HISTORY_SIZE; i++) {
       int32_t previous = maxHistory[i - 1];
       int32_t current = maxHistory[i];
@@ -281,6 +327,10 @@ void beri_podatke() {
         // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
         Serial.println("");
+        Serial.print("current = ");
+        Serial.println(current);
+        Serial.print("previous = ");
+        Serial.println(previous);
         step_counter++;
         counts_since_last_step = 0;
 
@@ -363,9 +413,9 @@ void acc_calib() {
       }
     }
 
-    acc_x_calib += (table_x / delilnik);
-    acc_y_calib += (table_y / delilnik);
-    acc_z_calib += (table_z / delilnik);
+    acc_x_calib += (table_x * G / delilnik);
+    acc_y_calib += (table_y * G / delilnik);
+    acc_z_calib += (table_z * G / delilnik);
 
     delay(1000 / rate);
   }
