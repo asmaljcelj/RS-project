@@ -142,7 +142,7 @@ void kalorije_poraba(int32_t nmb_of_steps) {
 
   total_distance += distance_current;
   Serial.print("Publishing message for 'Total distance': ");
-  Serial.println("Miklo gej!");
+  Serial.println(total_distance);
   Blynk.virtualWrite(V10, total_distance);
 
 }
