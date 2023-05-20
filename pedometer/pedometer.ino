@@ -161,7 +161,7 @@ int32_t preveriNajvecjoOs(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY
   return 2;
 }
 
-float* copyArray(float target[HISTORY_SIZE], float source[HISTORY_SIZE]) {
+float[HISTORY_SIZE] copyArray(float target[HISTORY_SIZE], float source[HISTORY_SIZE]) {
   for (int i = 0; i < HISTORY_SIZE; i++) {
     target[i] = source[i];
   }
