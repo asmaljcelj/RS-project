@@ -53,11 +53,6 @@ float weight = 75.0;
 int32_t height = 178;
 unsigned long cas_prejsnjega_koraka = 0;
 
-// funkcije:
-void beri_podatke();
-
-void reset_daily();
-
 float get_stride(int32_t Nsteps, int32_t height) {
   if (Nsteps == 1) {
     return height / 5;
@@ -222,7 +217,7 @@ void beri_podatke() {
     history_x[count] = acc_x / RATE;
     history_y[count] = acc_y / RATE;
     history_z[count] = acc_z / RATE;
-  
+
     // števec
     count = count + 1;
     counts_since_last_step++;
@@ -322,11 +317,11 @@ void beri_podatke() {
             step_counter++;
             counts_since_last_step = 0;
             cas_prejsnjega_koraka = cas_koraka;
-    
+
             Serial.print("Publishing message for 'Step counter': ");
             Serial.println(step_counter);
             Blynk.virtualWrite(V3, step_counter);
-    
+
             // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
             if (step_counter >= daily_steps) {
               Serial.print("Publishing message for 'Steps message': ");
@@ -351,7 +346,7 @@ void beri_podatke() {
     count = 0;
   }
 
-  
+
   // digitalWrite(PIN_LED, 1);
 }
 
@@ -363,7 +358,7 @@ void reset_daily() {
 
 void init_blynk() {
   Serial.println("Resetting all values");
-  
+
   // resetiramo vrednosti na nadzorni plošči
   Blynk.virtualWrite(V3, 0);
   Blynk.virtualWrite(V4, 0.0);
@@ -433,6 +428,7 @@ void acc_calib() {
   Serial.print(acc_y_calib);
   Serial.print("ACC: Z= ");
   Serial.print(acc_z_calib);
+  Serial.println();
 
   delay(1000);
 }
@@ -466,7 +462,6 @@ BLYNK_WRITE(V7) {
     Serial.println(height);
 }
 
-// Weight
 BLYNK_WRITE(V8)   {
     weight = param.asFloat();
     Serial.print("Reading message for 'Weight': ");
@@ -492,7 +487,7 @@ void setup() {
   Wire.write(128);
   Wire.endTransmission();
   delay(100);
-  
+
   // na register 28 poslji 0
   Wire.beginTransmission(I2C_ADD_MPU);
   Wire.write(28);
@@ -501,6 +496,7 @@ void setup() {
   delay(100);
 
   acc_calib();
+  init_blynk();
   tick_beri.attach_ms(INTERVAL_BERI, beri_podatke);
   tick_reset.attach(INTERVAL_RESET, reset_daily);
   tick_calories.attach_ms(INTERVAL_CALORIES, call_kalorije_poraba);
