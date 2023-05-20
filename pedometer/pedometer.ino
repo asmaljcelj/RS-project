@@ -51,6 +51,7 @@ int32_t daily_calories = 2500;
 // izmisljeni parametri
 float weight = 75.0;
 int32_t height = 178;
+unsigned long cas_prejsnjega_koraka = 0;
 
 // funkcije:
 void beri_podatke();
@@ -204,12 +205,12 @@ void beri_podatke() {
   }
 
   // izracun pospeska
-  acc_x = ((table_x * G / delilnik) - acc_x_calib);
-  acc_y = ((table_y * G / delilnik) - acc_y_calib);
-  acc_z = ((table_z * G / delilnik) - acc_z_calib);
+  acc_x += ((table_x * G / delilnik) - acc_x_calib);
+  acc_y += ((table_y * G / delilnik) - acc_y_calib);
+  acc_z += ((table_z * G / delilnik) - acc_z_calib);
 
   if (count % RATE == 0) {
-    // Izpišemo
+    // Izpišemo in shranimo pospesek
     Serial.print("ACC_X: X= ");
     Serial.print(acc_x);
     Serial.println("");
@@ -219,6 +220,19 @@ void beri_podatke() {
     Serial.print("ACC_Z: Z= ");
     Serial.print(acc_z);
     Serial.println("");
+
+    history_x[count] = acc_x / RATE;
+    history_y[count] = acc_y / RATE;
+    history_z[count] = acc_z / RATE;
+  
+    // števec
+    count = count + 1;
+    counts_since_last_step++;
+
+    // reset vrednosti
+    acc_x = 0;
+    acc_y = 0;
+    acc_z = 0;
   }
 
   if (count == HISTORY_SIZE) {
@@ -334,30 +348,37 @@ void beri_podatke() {
     for (int i = 1; i < HISTORY_SIZE; i++) {
       float previous = maxHistory[i - 1];
       float current = maxHistory[i];
-      if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2) {
-        // todo: upostevaj se cas med obema korakom (periodicnost!!!)
-        Serial.print("STEP DETECTED");
-        Serial.println("");
-        Serial.print("current = ");
-        Serial.println(current);
-        Serial.print("previous = ");
-        Serial.println(previous);
-        step_counter++;
-        counts_since_last_step = 0;
-
-        Serial.print("Publishing message for 'Step counter': ");
-        Serial.println(step_counter);
-        Blynk.virtualWrite(V3, step_counter);
-
-        // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
-        if (step_counter >= daily_steps) {
-          Serial.print("Publishing message for 'Steps message': ");
-          Serial.println("Daily steps goal reached!");
-          Blynk.virtualWrite(V5, "Daily steps goal reached!");
-        } else {
-          Serial.print("Publishing message for 'Steps message': ");
-          Serial.println("Daily steps goal not yet reached!");
-          Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
+      if (current < previous && previous > threshold && current < threshold && abs(previous - current) > 0.05) {
+        unsigned long cas_koraka = millis();
+        if (cas_prejsnjega_koraka != 0) {
+          unsigned long razlika_korakov = cas_koraka - cas_prejsnjega_koraka;
+          if (razlika >= 200) {
+            // todo: upostevaj se cas med obema korakom (periodicnost!!!)
+            Serial.print("STEP DETECTED");
+            Serial.println("");
+            Serial.print("current = ");
+            Serial.println(current);
+            Serial.print("previous = ");
+            Serial.println(previous);
+            step_counter++;
+            counts_since_last_step = 0;
+            cas_prejsnjega_koraka = cas_koraka;
+    
+            Serial.print("Publishing message for 'Step counter': ");
+            Serial.println(step_counter);
+            Blynk.virtualWrite(V3, step_counter);
+    
+            // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
+            if (step_counter >= daily_steps) {
+              Serial.print("Publishing message for 'Steps message': ");
+              Serial.println("Daily steps goal reached!");
+              Blynk.virtualWrite(V5, "Daily steps goal reached!");
+            } else {
+              Serial.print("Publishing message for 'Steps message': ");
+              Serial.println("Daily steps goal not yet reached!");
+              Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
+            }
+          }
         }
       }
     }
@@ -369,13 +390,7 @@ void beri_podatke() {
     count = 0;
   }
 
-  history_x[count] = acc_x;
-  history_y[count] = acc_y;
-  history_z[count] = acc_z;
-
-  // števec
-  count = count + 1;
-  counts_since_last_step++;
+  
   // digitalWrite(PIN_LED, 1);
 }
 
