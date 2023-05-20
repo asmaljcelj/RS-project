@@ -380,12 +380,14 @@ void beri_podatke() {
 }
 
 void reset_daily() {
+  Serial.println("Daily steps and calories reset");
   step_counter = 0;
   total_calories_burned = 0.0;
-  Serial.println("Daily steps and calories reset");
 }
 
 void init_blynk() {
+  Serial.println("Resetting all values");
+  
   // resetiramo vrednosti na nadzorni plošči
   Blynk.virtualWrite(V3, 0);
   Blynk.virtualWrite(V4, 0.0);
@@ -395,13 +397,7 @@ void init_blynk() {
 
   // prvič ročno preberemo višino in težo
   Blynk.syncVirtual(V7);
-  Serial.print("height: ");
-  Serial.println(height);
   Blynk.syncVirtual(V8);
-  Serial.print("weight: ");
-  Serial.println(weight);
-
-  Serial.println("Resetting all values");
 }
 
 void acc_calib()
