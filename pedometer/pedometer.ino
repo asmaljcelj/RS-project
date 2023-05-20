@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <Wire.h>
 #include <Ticker.h>
-#include <limits.h>
+#include <float.h>
 #include <BlynkSimpleEsp8266.h>
 
 #define INTERVAL_BERI 100
@@ -313,8 +313,8 @@ void beri_podatke() {
       }
     }
     // get max and min values
-    int max_value = INT_MIN;
-    int min_value = INT_MAX;
+    float max_value = FLT_MIN;
+    float min_value = FLT_MAX;
     for (int i = 0; i < HISTORY_SIZE; i++) {
       if (maxHistory[i] > max_value) {
         max_value = maxHistory[i];
