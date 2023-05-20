@@ -42,6 +42,10 @@ float delilnik = 16384.0f;
 float acc_x_calib = 0.0f;
 float acc_y_calib = 0.0f;
 float acc_z_calib = 0.0f;
+float prev_acc_x = 0.0f;
+float prev_acc_y = 0.0f;
+float prev_acc_z = 0.0f;
+int32_t max_axis = -1;
 // visok threshold na zacetku, da ne zaznamo korakov v mirovanju
 float threshold = 1000000.0f;
 int32_t counts_since_last_step = 0;
@@ -51,6 +55,8 @@ int32_t daily_calories = 2500;
 float weight = 75.0;
 int32_t height = 178;
 unsigned long cas_prejsnjega_koraka = 0;
+float max_value = FLT_MIN;
+float min_value = FLT_MAX;
 
 float get_stride(int32_t Nsteps, int32_t height) {
   if (Nsteps == 1) {
@@ -121,6 +127,42 @@ void kalorije_poraba(int32_t nmb_of_steps) {
     Serial.print("Publishing message for 'Calories message': ");
     Serial.println("Daily step calories not yet reached!");
     Blynk.virtualWrite(V9, "Daily calories goal not yet reached!");
+  }
+}
+
+void detectStep() {
+  unsigned long cas_koraka = millis();
+  if (cas_prejsnjega_koraka != 0) {
+    unsigned long razlika_korakov = cas_koraka - cas_prejsnjega_koraka;
+      if (razlika_korakov >= 200) {
+      // todo: upostevaj se cas med obema korakom (periodicnost!!!)
+        Serial.print("STEP DETECTED");
+        Serial.println("");
+        Serial.print("current = ");
+        Serial.println(current);
+        Serial.print("previous = ");
+        Serial.println(previous);
+        step_counter++;
+        counts_since_last_step = 0;
+        cas_prejsnjega_koraka = cas_koraka;
+  
+        Serial.print("Publishing message for 'Step counter': ");
+        Serial.println(step_counter);
+        Blynk.virtualWrite(V3, step_counter);
+  
+        // Preveri, ali je bil dosežen dnevni cilj korakov (5000 korakov)
+        if (step_counter >= daily_steps) {
+          Serial.print("Publishing message for 'Steps message': ");
+          Serial.println("Daily steps goal reached!");
+          Blynk.virtualWrite(V5, "Daily steps goal reached!");
+        } else {
+          Serial.print("Publishing message for 'Steps message': ");
+          Serial.println("Daily steps goal not yet reached!");
+          Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
+        }
+      }
+  } else {
+    cas_prejsnjega_koraka = cas_koraka;
   }
 }
 
@@ -227,7 +269,31 @@ void beri_podatke() {
     acc_z = 0;
   }
 
+  if (max_axis != -1) {
+    // prvih 50 meritev ne detektiramo, ker se ne vemo, v kateri osi imamo maximum
+    if (max_axis == 0) {
+      // x os
+      //current < previous && previous > threshold && current < threshold && abs(previous - current) > 0.05
+      if (acc_x < prev_acc_x && prev_acc_x > threshold && acc_x < threshold && abs(max_value - min_value) > 0.05) {
+        // step detected
+        detectStep();
+      }
+    } else if (max_axis == 1) {
+      // y os
+      if (acc_y < prev_acc_y && prev_acc_y > threshold && acc_y < threshold && abs(max_value - min_value) > 0.05) {
+        // step detected
+        detectStep();
+      }
+    } else if (max_axis == 2) {
+      if (acc_z < prev_acc_z && prev_acc_z > threshold && acc_z < threshold && abs(max_value - min_value) > 0.05) {
+        // step detected
+        detectStep();
+      }
+    }
+  }
+
   if (count == HISTORY_SIZE) {
+    // izracun meje
     Serial.print("START DETECTION STEP");
     Serial.println("");
     // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje)
@@ -262,26 +328,26 @@ void beri_podatke() {
     }
 
     // TODO: dinamično nastavljanje meje
-    int32_t najvecjaOs = preveriNajvecjoOs(smoothed_history_x, smoothed_history_y, smoothed_history_z);
+    max_axis = preveriNajvecjoOs(smoothed_history_x, smoothed_history_y, smoothed_history_z);
     Serial.print("Najvecja os = ");
-    Serial.println(najvecjaOs);
+    Serial.println(max_axis);
     float maxHistory[HISTORY_SIZE];
-    if (najvecjaOs == 0) {
+    if (max_axis == 0) {
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_x[i];
       }
-    } else if (najvecjaOs == 1) {
+    } else if (max_axis == 1) {
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_y[i];
       }
-    } else if (najvecjaOs == 2) {
+    } else if (max_axis == 2) {
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_z[i];
       }
     }
     // get max and min values
-    float max_value = FLT_MIN;
-    float min_value = FLT_MAX;
+    max_value = FLT_MIN;
+    min_value = FLT_MAX;
     for (int i = 0; i < HISTORY_SIZE; i++) {
       if (maxHistory[i] > max_value) {
         max_value = maxHistory[i];
@@ -298,6 +364,7 @@ void beri_podatke() {
     Serial.println("STEP_DETECTION");
     Serial.print("Threshold = ");
     Serial.println(threshold);
+    /*
     for (int i = 1; i < HISTORY_SIZE; i++) {
       float previous = maxHistory[i - 1];
       float current = maxHistory[i];
@@ -337,6 +404,7 @@ void beri_podatke() {
         }
       }
     }
+    */
 
     // set new threshold
     threshold = (max_value + min_value) / 2;
