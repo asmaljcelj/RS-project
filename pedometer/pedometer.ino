@@ -32,7 +32,7 @@ Ticker tick_calories;
 int32_t table_x[TABLE_SIZE_MPU];
 int32_t table_y[TABLE_SIZE_MPU];
 int32_t table_z[TABLE_SIZE_MPU];
-int32_t SMOOTHING_WINDOW = 2;
+int32_t SMOOTHING_WINDOW = 1;
 float history_x[HISTORY_SIZE];
 float history_y[HISTORY_SIZE];
 float history_z[HISTORY_SIZE];
@@ -238,13 +238,11 @@ void beri_podatke() {
   if (count == HISTORY_SIZE) {
     Serial.print("START DETECTION STEP");
     Serial.println("");
-    // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje
+    // glajenje (vzemi prejšnji, trenutni in naslednji measurment in vstavi povprečje)
     float smoothed_history_x[HISTORY_SIZE];
     float smoothed_history_y[HISTORY_SIZE];
     float smoothed_history_z[HISTORY_SIZE];
     for (int i = 0; i < HISTORY_SIZE; i++) {
-      //Serial.print("Start smoothing at ");
-      //Serial.println(i);
       float summed_x = 0.0f;
       float summed_y = 0.0f;
       float summed_z = 0.0f;
@@ -252,56 +250,22 @@ void beri_podatke() {
       int32_t number_summed_y = 0;
       int32_t number_summed_z = 0;
       int32_t start_index = i - SMOOTHING_WINDOW;
-      //Serial.print("START INDEX = ");
-      //Serial.println(start_index);
-      for (int smoothing_index = i - SMOOTHING_WINDOW; smoothing_index < i + SMOOTHING_WINDOW; smoothing_index++) {
+      for (int smoothing_index = i - SMOOTHING_WINDOW; smoothing_index <= i + SMOOTHING_WINDOW; smoothing_index++) {
         if (smoothing_index < 0 || smoothing_index > HISTORY_SIZE) {
           continue;
         }
-        //Serial.print("Summing at index ");
-        //Serial.println(smoothing_index);
-        //Serial.print("Adding to x ");
-        //Serial.println(history_x[i]);
-        summed_x += history_x[i];
+        summed_x += history_x[smoothing_index];
         number_summed_x++;
-        //Serial.print("Adding to y ");
-        //Serial.println(history_y[i]);
-        summed_y += history_y[i];
+        summed_y += history_y[smoothing_index];
         number_summed_y++;
-        //Serial.print("Adding to z ");
-        //Serial.println(history_z[i]);
-        summed_z += history_z[i];
+        summed_z += history_z[smoothing_index];
         number_summed_z++;
       }
-      //Serial.print("Summing x: ");
-      //Serial.print(summed_x);
-      //Serial.print(" and ");
-      //Serial.println(number_summed_x);
-      float average_x = summed_x / number_summed_x;
-      //Serial.print("Summing y: ");
-      //Serial.print(summed_y);
-      //Serial.print(" and ");
-      //Serial.println(number_summed_y);
-      float average_y = summed_y / number_summed_y;
-      //Serial.print("Summing z: ");
-      //Serial.print(summed_z);
-      //Serial.print(" and ");
-      //Serial.println(number_summed_z);
-      float average_z = summed_z / number_summed_z;
-      //Serial.print("Smoothed history_x[");
-      //Serial.print(i);
-      //Serial.print("] = ");
-      //Serial.println(average_x);
+      float average_x = summed_x / (number_summed_x * 1.0f);
+      float average_y = summed_y / (number_summed_y * 1.0f);
+      float average_z = summed_z / (number_summed_z * 1.0f);
       smoothed_history_x[i] = average_x;
-      //Serial.print("Smoothed history_y[");
-      //Serial.print(i);
-      //Serial.print("] = ");
-      //Serial.println(average_y);
       smoothed_history_y[i] = average_y;
-      //Serial.print("Smoothed history_z[");
-      //Serial.print(i);
-      //Serial.print("] = ");
-      //Serial.println(average_z);
       smoothed_history_z[i] = average_z;
     }
 
@@ -311,17 +275,14 @@ void beri_podatke() {
     Serial.println(najvecjaOs);
     float maxHistory[HISTORY_SIZE];
     if (najvecjaOs == 0) {
-      //memcpy(maxHistory, smoothed_history_x, HISTORY_SIZE);
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_x[i];
       }
     } else if (najvecjaOs == 1) {
-      //memcpy(maxHistory, smoothed_history_y, HISTORY_SIZE);,
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_y[i];
       }
     } else if (najvecjaOs == 2) {
-      //memcpy(maxHistory, smoothed_history_z, HISTORY_SIZE);
       for (int i = 0; i < HISTORY_SIZE; i++) {
         maxHistory[i] = smoothed_history_z[i];
       }
@@ -379,6 +340,8 @@ void beri_podatke() {
               Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
             }
           }
+        } else {
+          cas_prejsnjega_koraka = cas_koraka;
         }
       }
     }
@@ -402,7 +365,7 @@ void reset_daily() {
 
 void init_blynk() {
   Serial.println("Resetting all values");
-  
+
   // resetiramo vrednosti na nadzorni plošči
   Blynk.virtualWrite(V3, 0);
   Blynk.virtualWrite(V4, 0.0);
@@ -524,6 +487,20 @@ void setup() {
   Wire.begin(12, 14);
   // nastavimo frekvenco vodila na 100 kHz
   Wire.setClock(100000);
+
+  // na register 107 pošlji vrednost 128
+  Wire.beginTransmission(I2C_ADD_MPU);
+  Wire.write(107);
+  Wire.write(128);
+  Wire.endTransmission();
+  delay(100);
+
+  // na register 28 poslji 0
+  Wire.beginTransmission(I2C_ADD_MPU);
+  Wire.write(28);
+  Wire.write(0);
+  Wire.endTransmission();
+  delay(100);
 
   acc_calib();
   init_blynk();
