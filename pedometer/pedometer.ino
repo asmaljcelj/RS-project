@@ -229,8 +229,8 @@ void beri_podatke() {
     float smoothed_history_y[HISTORY_SIZE];
     float smoothed_history_z[HISTORY_SIZE];
     for (int i = 0; i < HISTORY_SIZE; i++) {
-      Serial.print("Start smoothing at ");
-      Serial.println(i);
+      //Serial.print("Start smoothing at ");
+      //Serial.println(i);
       float summed_x = 0.0f;
       float summed_y = 0.0f;
       float summed_z = 0.0f;
@@ -238,56 +238,56 @@ void beri_podatke() {
       int32_t number_summed_y = 0;
       int32_t number_summed_z = 0;
       int32_t start_index = i - SMOOTHING_WINDOW;
-      Serial.print("START INDEX = ");
-      Serial.println(start_index);
+      //Serial.print("START INDEX = ");
+      //Serial.println(start_index);
       for (int smoothing_index = i - SMOOTHING_WINDOW; smoothing_index < i + SMOOTHING_WINDOW; smoothing_index++) {
         if (smoothing_index < 0 || smoothing_index > HISTORY_SIZE) {
           continue;
         }
-        Serial.print("Summing at index ");
-        Serial.println(smoothing_index);
-        Serial.print("Adding to x ");
-        Serial.println(history_x[i]);
+        //Serial.print("Summing at index ");
+        //Serial.println(smoothing_index);
+        //Serial.print("Adding to x ");
+        //Serial.println(history_x[i]);
         summed_x += history_x[i];
         number_summed_x++;
-        Serial.print("Adding to y ");
-        Serial.println(history_y[i]);
+        //Serial.print("Adding to y ");
+        //Serial.println(history_y[i]);
         summed_y += history_y[i];
         number_summed_y++;
-        Serial.print("Adding to z ");
-        Serial.println(history_z[i]);
+        //Serial.print("Adding to z ");
+        //Serial.println(history_z[i]);
         summed_z += history_z[i];
         number_summed_z++;
       }
-      Serial.print("Summing x: ");
-      Serial.print(summed_x);
-      Serial.print(" and ");
-      Serial.println(number_summed_x);
+      //Serial.print("Summing x: ");
+      //Serial.print(summed_x);
+      //Serial.print(" and ");
+      //Serial.println(number_summed_x);
       float average_x = summed_x / number_summed_x;
-      Serial.print("Summing y: ");
-      Serial.print(summed_y);
-      Serial.print(" and ");
-      Serial.println(number_summed_y);
+      //Serial.print("Summing y: ");
+      //Serial.print(summed_y);
+      //Serial.print(" and ");
+      //Serial.println(number_summed_y);
       float average_y = summed_y / number_summed_y;
-      Serial.print("Summing z: ");
-      Serial.print(summed_z);
-      Serial.print(" and ");
-      Serial.println(number_summed_z);
+      //Serial.print("Summing z: ");
+      //Serial.print(summed_z);
+      //Serial.print(" and ");
+      //Serial.println(number_summed_z);
       float average_z = summed_z / number_summed_z;
-      Serial.print("Smoothed history_x[");
-      Serial.print(i);
-      Serial.print("] = ");
-      Serial.println(average_x);
+      //Serial.print("Smoothed history_x[");
+      //Serial.print(i);
+      //Serial.print("] = ");
+      //Serial.println(average_x);
       smoothed_history_x[i] = average_x;
-      Serial.print("Smoothed history_y[");
-      Serial.print(i);
-      Serial.print("] = ");
-      Serial.println(average_y);
+      //Serial.print("Smoothed history_y[");
+      //Serial.print(i);
+      //Serial.print("] = ");
+      //Serial.println(average_y);
       smoothed_history_y[i] = average_y;
-      Serial.print("Smoothed history_z[");
-      Serial.print(i);
-      Serial.print("] = ");
-      Serial.println(average_z);
+      //Serial.print("Smoothed history_z[");
+      //Serial.print(i);
+      //Serial.print("] = ");
+      //Serial.println(average_z);
       smoothed_history_z[i] = average_z;
     }
 
@@ -332,8 +332,12 @@ void beri_podatke() {
     Serial.print("Threshold = ");
     Serial.println(threshold);
     for (int i = 1; i < HISTORY_SIZE; i++) {
-      int32_t previous = maxHistory[i - 1];
-      int32_t current = maxHistory[i];
+      float previous = maxHistory[i - 1];
+      float current = maxHistory[i];
+      Serial.print("previous = ");
+      Serial.println(previous);
+      Serial.print("current = ");
+      Serial.println(current);
       if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2) {
         // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
