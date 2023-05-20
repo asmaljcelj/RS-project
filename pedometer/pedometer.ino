@@ -107,8 +107,12 @@ void kalorije_poraba(int32_t nmb_of_steps) {
 
     float stride = get_stride(nmb_of_steps_in_last_2s, height);
 
-    float speed = nmb_of_steps_in_last_2s * stride;
-    current_calories_burned = speed * weight / 400;
+    float speed = nmb_of_steps_in_last_2s * ((stride / 2) / 100);
+    Serial.print("speed");
+    Serial.println(speed);
+    Serial.print("stride");
+    Serial.println(stride);
+    current_calories_burned = speed * (weight / 400.0);
 
     Serial.print("Publishing message for 'Current calories': ");
     Serial.println(current_calories_burned);
@@ -467,6 +471,7 @@ void init_blynk() {
   Blynk.virtualWrite(V5, "Daily steps goal not yet reached!");
   Blynk.virtualWrite(V6, 0.0);
   Blynk.virtualWrite(V9, "Daily calories goal not yet reached!");
+  Blynk.virtualWrite(V10, 0.0);
 
   // prvič ročno preberemo višino in težo
   Blynk.syncVirtual(V7);
