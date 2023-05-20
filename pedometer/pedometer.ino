@@ -141,14 +141,14 @@ int32_t preveriNajvecjoOs(float s_table_x[HISTORY_SIZE], float s_table_y[HISTORY
   float max_z = 0.0f;
   // begin count
   for (int i = 0; i < HISTORY_SIZE; i++) {
-    if (abs(s_table_x[i]) > max_x) {
-      max_x = abs(s_table_x[i]);
+    if (s_table_x[i] > max_x) {
+      max_x = s_table_x[i];
     }
-    if (abs(s_table_y[i]) > max_y) {
-      max_y = abs(s_table_y[i]);
+    if (s_table_y[i] > max_y) {
+      max_y = s_table_y[i];
     }
-    if (abs(s_table_z[i]) > max_z) {
-      max_z = abs(s_table_z[i]);
+    if (s_table_z[i] > max_z) {
+      max_z = s_table_z[i];
     }
   }
   // get maximum
@@ -334,11 +334,7 @@ void beri_podatke() {
     for (int i = 1; i < HISTORY_SIZE; i++) {
       float previous = maxHistory[i - 1];
       float current = maxHistory[i];
-      Serial.print("previous = ");
-      Serial.println(previous);
-      Serial.print("current = ");
-      Serial.println(current);
-      if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2) {
+      if (current < previous && previous > threshold && current < threshold && counts_since_last_step > 2 && counts_since_last_step < 20) {
         // todo: upostevaj se cas med obema korakom (periodicnost!!!)
         Serial.print("STEP DETECTED");
         Serial.println("");
