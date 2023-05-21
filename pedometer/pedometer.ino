@@ -119,8 +119,10 @@ void kalorije_poraba(int32_t nmb_of_steps) {
     // moving
     int32_t nmb_of_steps_in_last_2s = nmb_of_steps - calorie_step_counter;
 
+    // calculate the stride based on number of steps in the last 2 seconds from the given table
     float stride = get_stride(nmb_of_steps_in_last_2s, height);
 
+    // divide stride by 200 since height is in cm 
     float speed = nmb_of_steps_in_last_2s * ((stride / 2) / 100);
     Serial.print("speed");
     Serial.println(speed);
@@ -132,10 +134,11 @@ void kalorije_poraba(int32_t nmb_of_steps) {
     Serial.println(current_calories_burned);
     Blynk.virtualWrite(V6, current_calories_burned);
 
+    // store steps already used in calculation for calories
     calorie_step_counter = nmb_of_steps;
   }
 
-  // todo total_calories_burned izračun
+  //total_calories_burned izračun
   total_calories_burned += current_calories_burned;
 
   Serial.print("Publishing message for 'Calories': ");
@@ -161,6 +164,7 @@ void kalorije_poraba(int32_t nmb_of_steps) {
   total_distance += distance_current;
   Serial.print("Publishing message for 'Total distance': ");
   Serial.println(total_distance);
+  //Divide for km conversion
   Blynk.virtualWrite(V10, total_distance / 100000);
 
 }
